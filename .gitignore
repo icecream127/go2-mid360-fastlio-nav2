@@ -1,0 +1,19 @@
+# ROS 2 / colcon generated files
+build/
+install/
+log/
+
+# Python generated files
+__pycache__/
+*.py[cod]
+
+# Editor and OS files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Gazebo user cache and recordings
+.gazebo/
+*.bag
+*.db3

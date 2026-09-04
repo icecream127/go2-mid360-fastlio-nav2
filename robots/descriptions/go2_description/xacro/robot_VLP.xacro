@@ -9,6 +9,7 @@
     <xacro:include filename="$(find go2_description)/xacro/leg.xacro"/>
     <!-- <xacro:include filename="$(find go2_description)/xacro/stairs.xacro"/> -->
     <xacro:include filename="$(find go2_description)/xacro/gazebo.xacro"/>
+    <xacro:include filename="$(find ros2_livox_simulation)/urdf/mid360.xacro"/>
     <!-- <xacro:include filename="$(find go2_gazebo)/launch/stairs.urdf.xacro"/> -->
 
     <!-- <xacro:stairs stairs="15" xpos="0" ypos="0" zpos="0" /> -->
@@ -124,7 +125,13 @@
     <xacro:leg name="rh" mirror="-1" mirror_dae="False"  front_hind="-1" front_hind_dae="False" />
     <xacro:leg name="lh" mirror="1"  mirror_dae="True"   front_hind="-1" front_hind_dae="False" />
 
-    <xacro:include filename="$(find go2_description)/xacro/velodyne.xacro"/>
-    <!-- <xacro:include filename="$(find go2_description)/xacro/laser.xacro"/> -->
+    <!-- MID-360 replaces the previous 2D/Velodyne sensor configuration. -->
+    <!-- MID-360 Gazebo plugin.  The plugin emits PointCloud2 on /livox/lidar. -->
+    <xacro:mid360 name="mid360_link" parent="base_link" topic="/livox/lidar"
+                  update_rate="5" samples="4000" downsample="1"
+                  range_max="30.0" noise_stddev="0.01">
+        <!-- Retains the existing sensor centre pose used by the VLP configuration. -->
+        <origin xyz="0.2 0 0.1177" rpy="0 0 0"/>
+    </xacro:mid360>
 
 </robot>

@@ -65,6 +65,8 @@ QuadrupedController::QuadrupedController():
     this->get_parameter("joint_controller_topic",      joint_control_topic);
     this->get_parameter("loop_rate",                   loop_rate);
     this->get_parameter("urdf",                        urdf);
+    this->get_parameter_or("cmd_vel_timeout", cmd_vel_timeout_, 0.5);
+    last_cmd_vel_time_ = clock_.now();
     
     cmd_vel_subscription_ = this->create_subscription<geometry_msgs::msg::Twist>(
         "cmd_vel/smooth", 10, std::bind(&QuadrupedController::cmdVelCallback_, this,  std::placeholders::_1));
@@ -100,6 +102,15 @@ QuadrupedController::QuadrupedController():
 
 void QuadrupedController::controlLoop_()
 {
+    if (cmd_vel_received_ &&
+        (clock_.now() - last_cmd_vel_time_).seconds() > cmd_vel_timeout_)
+    {
+        req_vel_.linear.x = 0.0;
+        req_vel_.linear.y = 0.0;
+        req_vel_.angular.z = 0.0;
+        cmd_vel_received_ = false;
+    }
+
     float target_joint_positions[12];
     geometry::Transformation target_foot_positions[4];
     bool foot_contacts[4];
@@ -118,6 +129,8 @@ void QuadrupedController::cmdVelCallback_(const geometry_msgs::msg::Twist::Share
     req_vel_.linear.x = msg->linear.x;
     req_vel_.linear.y = msg->linear.y;
     req_vel_.angular.z = msg->angular.z;
+    last_cmd_vel_time_ = clock_.now();
+    cmd_vel_received_ = true;
 }
 
 void QuadrupedController::cmdPoseCallback_(const geometry_msgs::msg::Pose::SharedPtr msg)

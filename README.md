@@ -1,169 +1,90 @@
-# unitree go2 ros2 - champ config
+# Go2 MID-360: Gazebo 3D Mapping and Navigation
 
-> This package contains the configuration files for the Unitree Go2 robot configured with the CHAMP controller in ROS 2 (humble). It includes development of config package along with upgrade in robot description model for ROS 2 Humble distribution.
+ROS 2 Humble project for Unitree Go2/CHAMP simulation with a Livox MID-360-style Gazebo Classic ray sensor, FAST-LIO 3D mapping, PCD-based ICP relocalization, and Nav2 navigation.
 
-## Unitree Go2:
-<div style="display: flex; gap: 50px;">
-  <img src="https://oss-global-cdn.unitree.com/static/c487f93e06954100a44fac4442b94d94_288x238.png" width="250" />
-  <img src=".docs/gazebo_launch.png" width="350" /> 
-</div>
+## Features
 
-> Unitree Robotics is focusing on the R&D, production, and sales of consumer and industry-class high-performance general-purpose legged and humanoid robots, six-axis manipulators, and so on. We attaches great importance to independent research and development and technological innovation, fully self-researching key core robot components such as motors, reducers, controllers, LIDAR and high-performance perception and motion control algorithms, integrating the entire robotics industry chain.
+- Go2 and MID-360 simulation in Gazebo Classic 11;
+- `/livox/lidar` PointCloud2, `/livox/lidar_custom` Livox CustomMsg, and a 2D `/scan` projection;
+- FAST-LIO 3D mapping and PCD export;
+- ICP relocalization in a saved PCD map;
+- Nav2 planning and obstacle avoidance after a manually supplied approximate initial pose.
 
-## CHAMP Controller:
-![champ](https://raw.githubusercontent.com/chvmp/champ/master/docs/images/robots.gif)
+The navigation TF chain is sensor based:
 
-> CHAMP is an open source development framework for building new quadrupedal robots and developing new control algorithms. The control framework is based on [*"Hierarchical controller for highly dynamic locomotion utilizing pattern modulation and impedance control : implementation on the MIT Cheetah robot"*](https://dspace.mit.edu/handle/1721.1/85490).
-
-## Resources:
-- [go2 description (URDF model)](https://github.com/unitreerobotics/unitree_ros/tree/master/robots/go2_description) 
-- [champ robot (configs)](https://github.com/chvmp/robots)
-- [champ controller](https://github.com/chvmp/champ)
-
-## Tested on:
-- Ubuntu 22.04 (ROS2 Humble)
-
-## Current state of package:
-
-- &check; Configure go2 robot with champ config
-- &check; Robots Configurations.
-    - &check; Porting of robot description packages to ROS 2.
-    - &check; Porting of robot URDF to ROS2 (add new ros2_control tag).
-    - &check; Porting of robot configurationf to ROS2.
-    - &check; Porting of robot launch Files to ROS2.
-- &check; Upgrade go2 description model for ros2 humble
-- &check; Spawning go2 in gazebo environment.
-- &check; Working rviz only demo.
-- &check; Working Gazebo with teleoperated robot.
-- &check; Adding IMU and 2D LiDAR.
-- &check; Adding 3D LiDAR (Velodyne).
-- &cross; Working Gazebo demo with SLAM.
-- &cross; Working Gazebo demo with nav2 integration.
-
-## 1. Installation
-
-### 1.0 Install ROS-based dependencies:
-```bash
-sudo apt install ros-humble-gazebo-ros2-control
-sudo apt install ros-humble-xacro
-sudo apt install ros-humble-robot-localization
-sudo apt install ros-humble-ros2-controllers
-sudo apt install ros-humble-ros2-control
-sudo apt install ros-humble-velodyne
-sudo apt install ros-humble-velodyne-gazebo-plugins
-sudo apt-get install ros-humble-velodyne-description
+```text
+map -> odom -> base_footprint -> base_link -> mid360_link
 ```
 
-### 1.1 Clone and install all dependencies:
-    
-```bash
-sudo apt install -y python3-rosdep
-rosdep update
+`/odom` is generated from FAST-LIO `/Odometry`. The main FAST-LIO navigation launch does not use Gazebo `/odom/ground_truth`.
 
-cd <your_ws>/src
-git clone https://github.com/anujjain-dev/unitree-go2-ros2.git
-cd <your_ws>
-rosdep install --from-paths src --ignore-src -r -y
-```
+## Requirements
 
-### 1.2 Build your workspace:
-```bash
-cd <your_ws>
-colcon build
-. <your_ws>/install/setup.bash
-```
-## 2. Quick Start
+- Ubuntu 22.04
+- ROS 2 Humble
+- Gazebo Classic 11
+- A ROS workspace, for example `~/go2_ws`
 
-You don't need a physical robot to run the following demos. Make sure you have ros2_control, gazebo ros, controller manager packages installed in your ros2 setup.
+## Installation
 
-### 2.1 Gazebo demo: Run the Gazebo environment
-```bash
-ros2 launch go2_config gazebo.launch.py
-```
-![Go2 Gazebo Launch](.docs/gazebo_launch.png)
-
-### 2.2 Walking demo in RVIZ: Run the gazebo along with rviz
-```bash
-ros2 launch go2_config gazebo.launch.py rviz:=true
-```
-![Go2 Gazebo RViz Launch](.docs/gazebo_rviz_launch.png)
-
-### 2.3 Run the teleop node:
-```bash
-ros2 run teleop_twist_keyboard teleop_twist_keyboard
-```
-https://github.com/user-attachments/assets/bcfeec70-12c5-49b8-b7a7-da4fa9b6dea5
-
-### 2.4 Go2 Velodyne Config Gazebo demo: Run the Gazebo environment
-```bash
-ros2 launch go2_config gazebo_velodyne.launch.py 
-```
-![Go2 Velodyne Gazebo Launch](.docs/gazebo_velodyne_launch.png)
-
-### 2.5 Go2 Veldyne Config Walking/PointCloud demo in RVIZ: Run the gazebo along with rviz
-```bash
-ros2 launch go2_config gazebo_velodyne.launch.py rviz:=true
-```
-
-> Note: set point cloud topic to `/velodyne_points`
-
-![Go2 Velodyne Gazebo RViz Launch](.docs/gazebo_velodyne_rviz_launch.png)
-
-### 2.6 Go2 Hokoyu 2D LiDAR Config Gazbeo demo: Run the Gazebo environment
-
-> NOTE: To use Laser instead of 3D Velodyne LiDAR, comment `<xacro:include filename="$(find go2_description)/xacro/velodyne.xacro"/>` and uncomment `<xacro:include filename="$(find go2_description)/xacro/laser.xacro"/>` in `robot_VLP.xacro` file located inside `robots/description/go2_description/xacro/` folder.
+Clone this repository into `<workspace>/src`, then run:
 
 ```bash
-ros2 launch go2_config gazebo_velodyne.launch.py 
+cd ~/go2_ws/src/unitree-go2-ros2
+chmod +x tools/setup_mid360_dependencies.bash
+./tools/setup_mid360_dependencies.bash
 ```
 
-To Run the gazebo along with rviz
+The setup script installs ROS packages, clones pinned versions of Livox SDK2, `livox_ros_driver2`, `livox_laser_simulation_ros2`, and `FAST_LIO_ROS2`, applies the project patches, and builds the workspace.
+
+## Workflows
+
+### Build a 3D map
+
 ```bash
-ros2 launch go2_config gazebo_velodyne.launch.py rviz:=true
+cd ~/go2_ws
+./src/unitree-go2-ros2/tools/run_fast_lio_3d_mapping.bash gui:=true show_rviz:=true
 ```
 
-## 3. Tuning gait parameters
+Drive with `teleop_twist_keyboard`; when mapping is complete, stop the launch with `Ctrl+C`. The configured output is `~/go2_ws/maps/mid360_3d.pcd`.
 
-The gait configuration for your robot can be found in <my_robot_config>/gait/gait.yaml.
+### Create a Nav2 map from a PCD
 
-![CHAMP Setup Assistant](https://raw.githubusercontent.com/chvmp/champ_setup_assistant/master/docs/images/gait_parameters.png)
+```bash
+python3 ~/go2_ws/src/unitree-go2-ros2/robots/configs/go2_config/scripts/pcd_to_nav2_map.py \
+  ~/go2_ws/maps/mid360_3d.pcd ~/go2_ws/maps/mid360_3d_nav \
+  --resolution 0.05 --z-min 0.35 --z-max 1.50 --padding 0.30 \
+  --min-points 2 --dilation-cells 1
+```
 
-- **Knee Orientation** - How the knees should be bent. You can can configure the robot to follow the following orientation .>> .>< .<< .<> where dot is the front side of the robot.
+This creates the matching `mid360_3d_nav.pgm` and `mid360_3d_nav.yaml` files.
 
-- **Max Linear Velocity X** (meters/second) - Robot's maximum forward/reverse speed.
+### Relocalize and navigate
 
-- **Max Linear Velocity Y** (meteres/second) - Robot's maximum speed when moving sideways.
+```bash
+cd ~/go2_ws
+./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash gui:=true show_rviz:=true
+```
 
-- **Max Angular Velocity Z** (radians/second)- Robot's maximum rotational speed.
+Wait for the stack to load. In RViz, use **2D Pose Estimate** to give an approximate position and heading, then use **Nav2 Goal**.
 
-- **Stance Duration** (seconds)- How long should each leg spend on the ground while walking. You can set this to default(0.25) if you're not sure. The higher the stance duration the further the displacement is from the reference point.
+To use another scene, give it a matching PCD and 2D projection:
 
-- **Leg Swing Height** (meters)- Trajectory height during swing phase.
+```bash
+./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash \
+  gui:=true show_rviz:=true \
+  pcd_map:=~/go2_ws/maps/example.pcd \
+  nav_map:=~/go2_ws/maps/example_nav.yaml
+```
 
-- **Leg Stance Height** (meters)- Trajectory depth during stance phase.
+## Limitations
 
-- **Robot Walking Height** (meters) - Distance from hip to the ground while walking. Take note that setting this parameter too high can get your robot unstable.
+- This is a Gazebo Classic ray-based MID-360 approximation, not a hardware-accurate Livox model or hardware driver.
+- ICP needs a reasonable manual initial pose and can fail in highly symmetric scenes or after large map changes.
+- Nav2 uses a 2D height slice projected from the 3D PCD for planning; FAST-LIO and ICP remain the 3D localization source.
 
-- **CoM X Translation** (meters) - You can use this parameter to move the reference point in the X axis. This is useful when you want to compensate for the weight if the center of mass is not in the middle of the robot (from front hip to rear hip). For instance, if you find that the robot is heavier at the back, you'll set a negative value to shift the reference point to the back.
+## Reproducibility notes
 
-- **Odometry Scaler** - You can use this parameter as a multiplier to the calculated velocities for dead reckoning. This can be useful to compensate odometry errors on open-loop systems. Normally this value ranges from 1.0 to 1.20.
+The `patches/` directory contains the required small patches for the pinned Livox Gazebo simulator and FAST-LIO sources. They add the Livox CustomMsg output required by FAST-LIO and make Ctrl+C save the accumulated PCD map.
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'feat: Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## Acknowledgements
-
-This project builds upon and incorporates work from the following projects:
-
-* [Unitree Robotics](https://github.com/unitreerobotics/unitree_ros) - For the Go2 robot description (URDF model).
-* [CHAMP](https://github.com/chvmp/champ) - For the quadruped controller framework.
-* [CHAMP Robots](https://github.com/chvmp/robots) - For robot configurations and setup examples.
-
-We are grateful to the developers and contributors of these projects for their valuable work.
+This project builds on Unitree Go2 descriptions, CHAMP, Livox SDK2, `livox_ros_driver2`, LCAS `livox_laser_simulation_ros2`, and `FAST_LIO_ROS2`. Their respective licenses apply to their source code.

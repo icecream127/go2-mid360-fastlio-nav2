@@ -3,10 +3,10 @@ import os
 import launch_ros
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, ExecuteProcess,
-                            IncludeLaunchDescription)
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
@@ -20,6 +20,7 @@ def generate_launch_description():
     headless = LaunchConfiguration("headless")
     paused = LaunchConfiguration("paused")
     lite = LaunchConfiguration("lite")
+    contact_sensor_enabled = LaunchConfiguration("contact_sensor")
     ros_control_file = LaunchConfiguration("ros_control_file")
     world_init_x = LaunchConfiguration("world_init_x")
     world_init_y = LaunchConfiguration("world_init_y")
@@ -36,6 +37,11 @@ def generate_launch_description():
     declare_headless = DeclareLaunchArgument("headless", default_value="False")
     declare_paused = DeclareLaunchArgument("paused", default_value="False")
     declare_lite = DeclareLaunchArgument("lite", default_value="False")
+    declare_contact_sensor = DeclareLaunchArgument(
+        "contact_sensor",
+        default_value="False",
+        description="Run the high-CPU CHAMP foot contact helper",
+    )
     declare_ros_control_file = DeclareLaunchArgument(
         "ros_control_file",
         default_value=os.path.join(gz_pkg_share, "config/ros_control.yaml"),
@@ -83,7 +89,7 @@ def generate_launch_description():
 
 
     start_gazebo_client_cmd = ExecuteProcess(
-        condition=IfCondition(PythonExpression([" not ", headless])),
+        condition=IfCondition(gui),
         cmd=["gzclient"],
         cwd=[launch_dir],
         output="screen",
@@ -114,6 +120,14 @@ def generate_launch_description():
         ],
     )
 
+    # The factory service becomes available before Gazebo has fully finished
+    # loading a world.  Delay the entity insertion so a previous gzserver
+    # teardown or a slow world load cannot leave a launch with no robot.
+    delayed_gazebo_spawner = TimerAction(
+        period=5.0,
+        actions=[start_gazebo_spawner_cmd],
+    )
+
     # TODO as for right now, running contact sensor results in RTF being reduced by factor of 2x.
     # So it needs to be fixed before using that. Unsure what it does actually because even without it
     # Champ seems to be all right
@@ -122,27 +136,34 @@ def generate_launch_description():
         executable="contact_sensor",
         output="screen",
         parameters=[{"use_sim_time": LaunchConfiguration("use_sim_time")},links_config],
+        condition=IfCondition(contact_sensor_enabled),
         # prefix=['xterm -e gdb -ex run --args'],
     )
 
-    robot_description = {"robot_description": Command(["xacro ", LaunchConfiguration("description_path")])}
+    robot_description = {
+        "robot_description": ParameterValue(
+            Command(["xacro ", LaunchConfiguration("description_path")]),
+            value_type=str,
+        )
+    }
 
 
-    load_joint_state_controller = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
-             'joint_states_controller'],
-        output='screen',
-    )
-
-    load_joint_trajectory_position_controller = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
-             'joint_group_position_controller'],
-        output='screen'
-    )
-    load_joint_trajectory_effort_controller = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
-             'joint_group_effort_controller'],
-        output='screen'
+    # The controller manager is created by gazebo_ros2_control only after the
+    # robot has been spawned.  The controller_manager spawner waits for that
+    # service, unlike an immediate `ros2 control load_controller` command.
+    controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        name="go2_controller_spawner",
+        output="screen",
+        arguments=[
+            "joint_states_controller",
+            "joint_group_effort_controller",
+            "--controller-manager",
+            "/controller_manager",
+            "--controller-manager-timeout",
+            "60",
+        ],
     )
 
     # joint_group_position_controller
@@ -154,6 +175,7 @@ def generate_launch_description():
             declare_headless,
             declare_paused,
             declare_lite,
+            declare_contact_sensor,
             declare_ros_control_file,
             declare_gazebo_world,
             declare_world_init_x,
@@ -163,10 +185,8 @@ def generate_launch_description():
             declare_description_path,
             start_gazebo_server_cmd,
             start_gazebo_client_cmd,
-            start_gazebo_spawner_cmd,
-            load_joint_state_controller,
-            # load_joint_trajectory_position_controller
-            load_joint_trajectory_effort_controller,
+            delayed_gazebo_spawner,
+            controller_spawner,
             contact_sensor
         ]
     )

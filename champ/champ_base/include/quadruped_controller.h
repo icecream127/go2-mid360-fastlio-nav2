@@ -65,6 +65,9 @@ class QuadrupedController: public rclcpp::Node
     
     champ::Velocities req_vel_;
     champ::Pose req_pose_;
+    rclcpp::Time last_cmd_vel_time_;
+    double cmd_vel_timeout_{0.5};
+    bool cmd_vel_received_{false};
 
     champ::GaitConfig gait_config_;
 

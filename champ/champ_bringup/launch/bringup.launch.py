@@ -210,6 +210,7 @@ def generate_launch_description():
         executable="ekf_node",
         name="footprint_to_odom_ekf",
         output="screen",
+        condition=IfCondition(LaunchConfiguration("publish_odom_tf")),
         parameters=[
             {"base_link_frame": LaunchConfiguration("base_link_frame")},
             {"use_sim_time": LaunchConfiguration("use_sim_time")},
