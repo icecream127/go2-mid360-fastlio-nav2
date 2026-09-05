@@ -29,7 +29,7 @@ map -> odom -> base_footprint -> base_link -> mid360_link
 
 仓库已包含与默认 Gazebo 场景 `mid360_mapping.world` 对应的三维 PCD 地图和 Nav2 二维地图。首次安装完成后，无需自行建图，即可直接启动仿真、重定位和导航。
 
-### 1. 首次安装（只需一次）
+### 1. 首次安装
 
 在已安装 Ubuntu 22.04、ROS 2 Humble 和 Gazebo Classic 11 的终端中执行：
 
