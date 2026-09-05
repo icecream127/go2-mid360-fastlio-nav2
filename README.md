@@ -25,19 +25,51 @@ map -> odom -> base_footprint -> base_link -> mid360_link
 - Gazebo Classic 11
 - 一个 ROS 2 工作空间，例如 `~/go2_ws`
 
-## 安装
+## 快速开始：直接使用仓库随附地图导航
 
-将本项目克隆到工作空间的 `src` 目录后，执行一次依赖安装脚本：
+仓库已包含与默认 Gazebo 场景 `mid360_mapping.world` 对应的三维 PCD 地图和 Nav2 二维地图。首次安装完成后，无需自行建图，即可直接启动仿真、重定位和导航。
+
+### 1. 首次安装（只需一次）
+
+在已安装 Ubuntu 22.04、ROS 2 Humble 和 Gazebo Classic 11 的终端中执行：
 
 ```bash
-cd ~/go2_ws/src/unitree-go2-ros2
-chmod +x tools/setup_mid360_dependencies.bash
+mkdir -p ~/go2_ws/src
+cd ~/go2_ws/src
+git clone https://github.com/icecream127/go2-mid360-fastlio-nav2.git unitree-go2-ros2
+cd unitree-go2-ros2
 ./tools/setup_mid360_dependencies.bash
 ```
 
-该脚本会安装 ROS 依赖，下载指定版本的 Livox SDK2、`livox_ros_driver2`、`livox_laser_simulation_ros2` 与 `FAST_LIO_ROS2`，自动应用本项目所需补丁，并编译整个工作空间。
+安装脚本会安装 ROS 依赖，下载指定版本的 Livox SDK2、`livox_ros_driver2`、`livox_laser_simulation_ros2` 与 `FAST_LIO_ROS2`，自动应用项目补丁并编译整个工作空间。脚本会请求一次 `sudo` 密码；首次执行需要几分钟。
 
-## 使用流程
+### 2. 启动随附地图的重定位与导航
+
+```bash
+cd ~/go2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+
+export GAZEBO_MODEL_DATABASE_URI=""
+export QT_QPA_PLATFORM=xcb
+
+./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash gui:=true show_rviz:=true
+```
+
+等待约半分钟，Gazebo 和 RViz 会依次打开。RViz 中的黑色障碍物地图就是仓库随附的完整二维导航地图。
+
+### 3. 在 RViz 中发送导航目标
+
+1. 选择工具栏的 **2D Pose Estimate**，在地图中机器狗实际出现的附近拖出一个大概的初始位置与朝向；
+2. 等待数秒，让 ICP 与 FAST-LIO 点云定位稳定；
+3. 选择 **Nav2 Goal**，在可通行区域拖出目标位置和朝向；
+4. 左下角显示 `Feedback: reached` 即表示到达。
+
+按启动终端的 `Ctrl+C` 可停止仿真。
+
+> 随附地图只对应本项目默认的 Gazebo 场景。若更换 `.world` 场景，必须重新建图并生成对应的 PCD 与二维导航地图。
+
+## 可选：自行建图
 
 ### 1. 三维建图
 
@@ -79,7 +111,7 @@ mid360_3d_nav.pgm
 mid360_3d_nav.yaml
 ```
 
-### 3. 已有地图上的重定位与导航
+### 3. 使用自行生成的地图导航
 
 ```bash
 cd ~/go2_ws
@@ -97,8 +129,8 @@ cd ~/go2_ws
 ```bash
 ./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash \
   gui:=true show_rviz:=true \
-  pcd_map:=~/go2_ws/maps/example.pcd \
-  nav_map:=~/go2_ws/maps/example_nav.yaml
+  pcd_map:=$HOME/go2_ws/maps/example.pcd \
+  nav_map:=$HOME/go2_ws/maps/example_nav.yaml
 ```
 
 ## 已知限制
