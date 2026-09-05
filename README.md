@@ -1,6 +1,6 @@
 # Go2 + MID-360：Gazebo 三维建图、重定位与导航
 
-本项目基于 WSL2、ROS 2 Humble、Gazebo Classic 和 CHAMP 四足控制器，为 Unitree Go2 仿真接入 MID-360 三维激光雷达，并实现 FAST-LIO 三维建图、基于 PCD 地图的 ICP 重定位和 Nav2 导航。
+本项目基于 ROS 2 Humble、Gazebo Classic 和 CHAMP 四足控制器，为 Unitree Go2 仿真接入 MID-360 风格三维激光雷达，并实现 FAST-LIO 三维建图、基于 PCD 地图的 ICP 重定位和 Nav2 导航。
 
 ## 项目功能
 
@@ -16,8 +16,7 @@
 map -> odom -> base_footprint -> base_link -> mid360_link
 ```
 
-其中 `/odom` 由 FAST-LIO 的 `/Odometry` 转换而来。
-主导航流程不使用 Gazebo 的 `/odom/ground_truth` 真值里程计。
+其中 `/odom` 由 FAST-LIO 的 `/Odometry` 转换而来。主导航流程不使用 Gazebo 的 `/odom/ground_truth` 真值里程计。
 
 ## 运行环境
 
@@ -110,6 +109,6 @@ cd ~/go2_ws
 
 ## 可复现性说明
 
-`patches/` 保存了本项目对指定版本 Livox Gazebo 插件和 FAST-LIO 的必要补丁：前者为 FAST-LIO 补充 Livox CustomMsg 输出，后者保证在 `Ctrl+C` 结束建图时保存完整 PCD 地图。
+`patches/` 保存了本项目对指定版本 Livox Gazebo 插件和 FAST-LIO 的必要补丁：它们分别补充 FAST-LIO 所需的 Livox CustomMsg，并保证在 `Ctrl+C` 结束建图时保存完整 PCD 地图。安装脚本同时处理 Livox ROS 驱动在 ROS 2 Humble 下的构建兼容性。
 
 本项目建立在 Unitree Go2 description、CHAMP、Livox SDK2、`livox_ros_driver2`、LCAS `livox_laser_simulation_ros2` 与 `FAST_LIO_ROS2` 等开源项目之上，相关源码分别遵循其原始许可证。

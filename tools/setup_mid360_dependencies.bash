@@ -56,6 +56,19 @@ cp "${SRC_DIR}/livox_ros_driver2/package_ROS2.xml" \
 
 apply_patch_once "${SRC_DIR}/livox_laser_simulation_ros2" \
   "${REPO_DIR}/patches/livox_laser_simulation_ros2.patch"
+# Livox driver2's Humble branch links the generated message target directly,
+# but still references two legacy variables which are unset on newer CMake.
+sed -i \
+  -e '/${LIVOX_INTERFACES_INCLUDE_DIRECTORIES}   # for custom msgs/d' \
+  -e '/${LIVOX_INTERFACE_TARGET}   # for custom msgs/d' \
+  "${SRC_DIR}/livox_ros_driver2/CMakeLists.txt"
+if ! grep -q 'CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp' \
+  "${SRC_DIR}/livox_ros_driver2/CMakeLists.txt"; then
+  sed -i '/target_link_libraries(${PROJECT_NAME} "${cpp_typesupport_target}")/a\
+    add_dependencies(${PROJECT_NAME} ${LIVOX_INTERFACES})\
+    target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp")' \
+    "${SRC_DIR}/livox_ros_driver2/CMakeLists.txt"
+fi
 apply_patch_once "${SRC_DIR}/FAST_LIO_ROS2" \
   "${REPO_DIR}/patches/fast_lio_ros2.patch"
 
