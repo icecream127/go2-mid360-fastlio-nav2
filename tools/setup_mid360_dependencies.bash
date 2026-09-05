@@ -14,6 +14,9 @@ clone_at_commit() {
     git clone --recursive "${url}" "${destination}"
   fi
   git -C "${destination}" fetch --tags origin
+  # Dependencies are managed by this script.  Reset them before applying
+  # project patches so a previously interrupted setup cannot retain edits.
+  git -C "${destination}" reset --hard "${commit}"
   git -C "${destination}" checkout --detach "${commit}"
 }
 
@@ -69,6 +72,14 @@ if ! grep -q 'CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp' \
     target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp")' \
     "${SRC_DIR}/livox_ros_driver2/CMakeLists.txt"
 fi
+if ! grep -q 'Ensure generated Livox message headers are available' \
+  "${SRC_DIR}/livox_ros_driver2/CMakeLists.txt"; then
+  sed -i '/# include file direcotry/i\
+  # Ensure generated Livox message headers are available to the driver target.\
+  add_dependencies(${PROJECT_NAME} ${LIVOX_INTERFACES})\
+  target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp")\
+' "${SRC_DIR}/livox_ros_driver2/CMakeLists.txt"
+fi
 apply_patch_once "${SRC_DIR}/FAST_LIO_ROS2" \
   "${REPO_DIR}/patches/fast_lio_ros2.patch"
 
@@ -76,7 +87,9 @@ sudo rosdep init 2>/dev/null || true
 rosdep update
 cd "${WORKSPACE_DIR}"
 rosdep install --from-paths src --ignore-src -r -y
-colcon build --symlink-install
+# External sources above are patched in place.  Force CMake to reconfigure so
+# a previous interrupted build cannot retain stale include paths.
+colcon build --symlink-install --cmake-force-configure
 
 # Make the committed example map available at the same workspace-level path
 # used by the default launch arguments.  Do not overwrite a user's own map.
