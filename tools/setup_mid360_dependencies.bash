@@ -60,4 +60,14 @@ cd "${WORKSPACE_DIR}"
 rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 
+# Make the committed example map available at the same workspace-level path
+# used by the default launch arguments.  Do not overwrite a user's own map.
+mkdir -p "${WORKSPACE_DIR}/maps"
+cp -n "${REPO_DIR}/robots/configs/go2_config/maps/mid360_3d.pcd" \
+  "${WORKSPACE_DIR}/maps/"
+cp -n "${REPO_DIR}/robots/configs/go2_config/maps/mid360_3d_nav.pgm" \
+  "${WORKSPACE_DIR}/maps/"
+cp -n "${REPO_DIR}/robots/configs/go2_config/maps/mid360_3d_nav.yaml" \
+  "${WORKSPACE_DIR}/maps/"
+
 echo "Dependencies and workspace build completed."

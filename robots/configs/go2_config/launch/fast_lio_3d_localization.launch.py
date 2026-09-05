@@ -10,6 +10,9 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     go2_share = get_package_share_directory("go2_config")
+    workspace_dir = os.path.abspath(
+        os.path.join(go2_share, "..", "..", "..", "..")
+    )
 
     world = LaunchConfiguration("world")
     gui = LaunchConfiguration("gui")
@@ -69,7 +72,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "map_file",
                 default_value=os.path.join(
-                    os.path.expanduser("~"), "go2_ws", "maps", "mid360_3d.pcd"
+                    workspace_dir, "maps", "mid360_3d.pcd"
                 ),
             ),
             fast_lio_stack,

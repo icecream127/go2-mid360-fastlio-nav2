@@ -18,6 +18,9 @@ def generate_launch_description():
     go2_share = get_package_share_directory("go2_config")
     nav2_share = get_package_share_directory("nav2_bringup")
     champ_navigation_share = get_package_share_directory("champ_navigation")
+    workspace_dir = os.path.abspath(
+        os.path.join(go2_share, "..", "..", "..", "..")
+    )
 
     world = LaunchConfiguration("world")
     gui = LaunchConfiguration("gui")
@@ -94,13 +97,13 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "pcd_map",
             default_value=os.path.join(
-                os.path.expanduser("~"), "go2_ws", "maps", "mid360_3d.pcd"
+                workspace_dir, "maps", "mid360_3d.pcd"
             ),
         ),
         DeclareLaunchArgument(
             "nav_map",
             default_value=os.path.join(
-                os.path.expanduser("~"), "go2_ws", "maps", "mid360_3d_nav.yaml"
+                workspace_dir, "maps", "mid360_3d_nav.yaml"
             ),
         ),
         DeclareLaunchArgument(

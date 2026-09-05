@@ -7,7 +7,8 @@
     filter_size_map: 0.25
     cube_side_length: 100.0
     runtime_pos_log_enable: false
-    map_file_path: "/home/ice/go2_ws/maps/mid360_3d.pcd"
+    # The launch file overrides this with <current_workspace>/maps/mid360_3d.pcd.
+    map_file_path: "mid360_3d.pcd"
 
     common:
       # The Gazebo plugin publishes this Livox CustomMsg alongside its raw
