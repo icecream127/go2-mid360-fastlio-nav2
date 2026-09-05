@@ -33,6 +33,10 @@ def generate_launch_description():
             # Nav2's local odometry is derived from FAST-LIO below.  Do not
             # start the legacy Gazebo ground-truth odometry helper.
             "ground_truth_odom": "false",
+            "save_pcd": "false",
+            # Keep even an explicitly requested map-save service away from
+            # the reference PCD used by ICP.
+            "map_output": os.path.join(workspace_dir, "maps", "localization_session.pcd"),
         }.items(),
     )
 

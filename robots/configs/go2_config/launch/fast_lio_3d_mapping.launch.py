@@ -7,6 +7,7 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -46,7 +47,9 @@ def generate_launch_description():
         output="screen",
         parameters=[
             os.path.join(go2_share, "config", "fast_lio_mid360_sim.yaml"),
-            {"use_sim_time": use_sim_time, "map_file_path": map_output},
+            {"use_sim_time": use_sim_time, "map_file_path": map_output,
+             "pcd_save.pcd_save_en": ParameterValue(
+                 LaunchConfiguration("save_pcd"), value_type=bool)},
         ],
     )
 
@@ -70,6 +73,7 @@ def generate_launch_description():
             DeclareLaunchArgument("show_rviz", default_value="true"),
             DeclareLaunchArgument("use_sim_time", default_value="true"),
             DeclareLaunchArgument("ground_truth_odom", default_value="false"),
+            DeclareLaunchArgument("save_pcd", default_value="true"),
             DeclareLaunchArgument(
                 "map_output",
                 default_value=os.path.join(

@@ -7,17 +7,33 @@ REPO_DIR="$(builtin cd "${SCRIPT_DIR}/.." >/dev/null && pwd)"
 WORKSPACE_DIR="$(builtin cd "${REPO_DIR}/../.." >/dev/null && pwd)"
 SRC_DIR="${WORKSPACE_DIR}/src"
 
+if [[ ! -f /opt/ros/humble/setup.bash ]]; then
+  echo "Install ROS 2 Humble first: /opt/ros/humble/setup.bash is missing." >&2
+  exit 1
+fi
+set +u
+source /opt/ros/humble/setup.bash
+set -u
+
 clone_at_commit() {
   local name="$1" url="$2" commit="$3"
   local destination="${SRC_DIR}/${name}"
+  if [[ -d "${destination}/.git" ]] &&
+     [[ -n "$(git -C "${destination}" status --porcelain --untracked-files=all)" ]]; then
+    # Preserve the entire checkout (including untracked files) outside src,
+    # so colcon cannot discover duplicate packages in the backup.
+    local backup
+    mkdir -p "${WORKSPACE_DIR}/dependency_backups"
+    backup="$(mktemp -d "${WORKSPACE_DIR}/dependency_backups/${name}.XXXXXX")"
+    mv "${destination}" "${backup}/${name}"
+    echo "Preserved modified dependency: ${backup}/${name}"
+  fi
   if [[ ! -d "${destination}/.git" ]]; then
     git clone --recursive "${url}" "${destination}"
   fi
   git -C "${destination}" fetch --tags origin
-  # Dependencies are managed by this script.  Reset them before applying
-  # project patches so a previously interrupted setup cannot retain edits.
-  git -C "${destination}" reset --hard "${commit}"
   git -C "${destination}" checkout --detach "${commit}"
+  git -C "${destination}" submodule update --init --recursive
 }
 
 apply_patch_once() {
@@ -34,6 +50,7 @@ apply_patch_once() {
 
 sudo apt update
 sudo apt install -y \
+  git build-essential cmake python3-colcon-common-extensions \
   python3-rosdep python3-numpy python3-scipy \
   ros-humble-gazebo-ros-pkgs ros-humble-gazebo-ros2-control \
   ros-humble-xacro ros-humble-robot-localization \
@@ -87,9 +104,19 @@ sudo rosdep init 2>/dev/null || true
 rosdep update
 cd "${WORKSPACE_DIR}"
 rosdep install --from-paths src --ignore-src -r -y
+# Build the SDK first into this workspace.  The driver otherwise finds an
+# unrelated /usr/local SDK or races the SDK build on a fresh machine.
+SDK_PREFIX="${WORKSPACE_DIR}/install/livox-sdk2"
+cmake -S "${SRC_DIR}/Livox-SDK2" -B "${WORKSPACE_DIR}/build/livox_sdk2_bootstrap" \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${SDK_PREFIX}"
+cmake --build "${WORKSPACE_DIR}/build/livox_sdk2_bootstrap" --parallel 2
+cmake --install "${WORKSPACE_DIR}/build/livox_sdk2_bootstrap"
 # External sources above are patched in place.  Force CMake to reconfigure so
 # a previous interrupted build cannot retain stale include paths.
-colcon build --symlink-install --cmake-force-configure
+colcon build --symlink-install --cmake-force-configure --packages-skip livox_sdk2 \
+  --cmake-args -DDISTRO_ROS=humble \
+  -DLIVOX_LIDAR_SDK_LIBRARY="${SDK_PREFIX}/lib/liblivox_lidar_sdk_shared.so" \
+  -DLIVOX_LIDAR_SDK_INCLUDE_DIR="${SDK_PREFIX}/include"
 
 # Make the committed example map available at the same workspace-level path
 # used by the default launch arguments.  Do not overwrite a user's own map.

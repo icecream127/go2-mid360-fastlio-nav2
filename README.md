@@ -34,6 +34,9 @@ map -> odom -> base_footprint -> base_link -> mid360_link
 在已安装 Ubuntu 22.04、ROS 2 Humble 和 Gazebo Classic 11 的终端中执行：
 
 ```bash
+source /opt/ros/humble/setup.bash
+sudo apt update
+sudo apt install -y git
 mkdir -p ~/go2_ws/src
 cd ~/go2_ws/src
 git clone https://github.com/icecream127/go2-mid360-fastlio-nav2.git unitree-go2-ros2
@@ -41,7 +44,9 @@ cd unitree-go2-ros2
 ./tools/setup_mid360_dependencies.bash
 ```
 
-安装脚本会安装 ROS 依赖，下载指定版本的 Livox SDK2、`livox_ros_driver2`、`livox_laser_simulation_ros2` 与 `FAST_LIO_ROS2`，自动应用项目补丁并编译整个工作空间。脚本会请求一次 `sudo` 密码；首次执行需要几分钟。
+安装脚本会加载 Humble 环境、安装构建工具与 ROS 依赖，下载指定版本的 Livox SDK2、`livox_ros_driver2`、`livox_laser_simulation_ros2` 与 `FAST_LIO_ROS2`，自动应用项目补丁。SDK 先安装到当前工作空间的 `install/livox-sdk2`，驱动随后明确使用这份 SDK 编译，无需手动向 `/usr/local` 安装 SDK。安装过程需要网络和 sudo 权限，耗时取决于网络与电脑性能。
+
+重复执行安装时，含有修改或未跟踪文件的第三方仓库（包括上次安装应用的补丁）会被完整移到工作空间的 `dependency_backups/` 下，终端会打印备份路径，然后重新下载固定版本。备份中的自定义修改不会自动合并。已有运行地图不会被安装脚本覆盖。
 
 ### 2. 启动随附地图的重定位与导航
 
@@ -67,11 +72,17 @@ export QT_QPA_PLATFORM=xcb
 
 按启动终端的 `Ctrl+C` 可停止仿真。
 
+导航模式关闭 FAST-LIO 的 PCD 自动保存，退出导航不会用本次扫描覆盖已有定位地图。只有主动运行后面的建图流程才会保存新地图。
+
+安装完成的标志是终端显示 `Dependencies and workspace build completed.`。使用前关闭其他工作空间运行的同类仿真，避免同名话题和 Gazebo 端口冲突。当前定位使用 FAST-LIO + ICP，RViz 面板的 `Localization: inactive` 不能单独判定 ICP 是否工作；应结合终端的 `ICP accepted` 日志和扫描与地图的对齐情况判断。
+
 > 随附地图只对应本项目默认的 Gazebo 场景。若更换 `.world` 场景，必须重新建图并生成对应的 PCD 与二维导航地图。
 
 ## 可选：自行建图
 
 ### 1. 三维建图
+
+此可选流程会写入 `maps/mid360_3d.pcd`，需要保留原地图时请先备份 `maps/`。仅体验随附地图导航时无需执行。
 
 ```bash
 cd ~/go2_ws
