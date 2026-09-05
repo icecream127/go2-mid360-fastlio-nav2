@@ -49,6 +49,11 @@ clone_at_commit livox_laser_simulation_ros2 https://github.com/LCAS/livox_laser_
 clone_at_commit FAST_LIO_ROS2 https://github.com/Ericsii/FAST_LIO_ROS2.git \
   2fffc570a25d0df172720bac034fbdb6a13d2162
 
+# Livox keeps the ROS 2 manifest under this nonstandard filename.  Colcon
+# only recognizes package.xml, so create the expected local copy.
+cp "${SRC_DIR}/livox_ros_driver2/package_ROS2.xml" \
+  "${SRC_DIR}/livox_ros_driver2/package.xml"
+
 apply_patch_once "${SRC_DIR}/livox_laser_simulation_ros2" \
   "${REPO_DIR}/patches/livox_laser_simulation_ros2.patch"
 apply_patch_once "${SRC_DIR}/FAST_LIO_ROS2" \
