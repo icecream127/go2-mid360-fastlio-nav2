@@ -78,6 +78,44 @@ export QT_QPA_PLATFORM=xcb
 
 > 随附地图只对应本项目默认的 Gazebo 场景。若更换 `.world` 场景，必须重新建图并生成对应的 PCD 与二维导航地图。
 
+## Docker 运行（Windows 10/11 + WSL2）
+
+Docker 镜像基于官方 `osrf/ros:humble-desktop-full-jammy`，镜像构建时会在隔离环境内下载固定版本依赖、编译 Livox SDK 和整个 ROS 2 工作空间。Gazebo 与 RViz 通过 WSLg 显示到 Windows 桌面。
+
+先在 Windows 安装 Docker Desktop，启用 **Use the WSL 2 based engine**，并在 **Settings → Resources → WSL Integration** 中开启当前 Ubuntu 发行版。然后在 WSL 终端确认：
+
+```bash
+docker version
+docker compose version
+```
+
+构建镜像：
+
+```bash
+cd ~/go2_ws/src/unitree-go2-ros2
+docker compose build
+```
+
+首次构建会下载 ROS Desktop 镜像和所有源码，耗时较长且需要较多磁盘空间。成功后启动完整的随附地图导航：
+
+```bash
+docker compose up
+```
+
+Gazebo 和 RViz 打开后，仍按前面的 **2D Pose Estimate → 等待 ICP → Nav2 Goal** 顺序操作。在终端按 `Ctrl+C` 停止，然后执行：
+
+```bash
+docker compose down
+```
+
+容器中的 `/go2_ws/maps` 使用名为 `go2-maps` 的 Docker volume 持久保存，重新创建容器不会丢失地图。
+
+当前项目不需要 CUDA。默认设置 `LIBGL_ALWAYS_SOFTWARE=1`，优先保证 WSLg 图形兼容性。只有确认 Docker Desktop 已启用 NVIDIA GPU，并且后续加入了实际使用 CUDA 的算法时，才使用可选配置：
+
+```bash
+docker compose -f compose.yaml -f compose.cuda.yaml up
+```
+
 ## 可选：自行建图
 
 ### 1. 三维建图

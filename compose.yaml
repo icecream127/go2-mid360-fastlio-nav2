@@ -1,0 +1,29 @@
+services:
+  go2-nav:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: go2-mid360-fastlio-nav2:humble
+    container_name: go2-mid360-nav
+    init: true
+    stdin_open: true
+    tty: true
+    shm_size: 2gb
+    environment:
+      DISPLAY: "${DISPLAY:-:0}"
+      WAYLAND_DISPLAY: "${WAYLAND_DISPLAY:-wayland-0}"
+      XDG_RUNTIME_DIR: /mnt/wslg/runtime-dir
+      PULSE_SERVER: unix:/mnt/wslg/PulseServer
+      QT_QPA_PLATFORM: xcb
+      QT_X11_NO_MITSHM: "1"
+      LIBGL_ALWAYS_SOFTWARE: "${LIBGL_ALWAYS_SOFTWARE:-1}"
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /mnt/wslg:/mnt/wslg:rw
+      - go2-maps:/go2_ws/maps
+      - gazebo-cache:/root/.gazebo
+    stop_grace_period: 20s
+
+volumes:
+  go2-maps:
+  gazebo-cache:

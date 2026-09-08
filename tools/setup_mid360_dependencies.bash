@@ -7,6 +7,15 @@ REPO_DIR="$(builtin cd "${SCRIPT_DIR}/.." >/dev/null && pwd)"
 WORKSPACE_DIR="$(builtin cd "${REPO_DIR}/../.." >/dev/null && pwd)"
 SRC_DIR="${WORKSPACE_DIR}/src"
 
+if [[ "${EUID}" -eq 0 ]]; then
+  ROOT_CMD=()
+elif command -v sudo >/dev/null 2>&1; then
+  ROOT_CMD=(sudo)
+else
+  echo "Run as root or install sudo before running this script." >&2
+  exit 1
+fi
+
 if [[ ! -f /opt/ros/humble/setup.bash ]]; then
   echo "Install ROS 2 Humble first: /opt/ros/humble/setup.bash is missing." >&2
   exit 1
@@ -48,8 +57,8 @@ apply_patch_once() {
   fi
 }
 
-sudo apt update
-sudo apt install -y \
+"${ROOT_CMD[@]}" apt update
+"${ROOT_CMD[@]}" apt install -y \
   git build-essential cmake python3-colcon-common-extensions \
   python3-rosdep python3-numpy python3-scipy \
   ros-humble-gazebo-ros-pkgs ros-humble-gazebo-ros2-control \
@@ -100,7 +109,7 @@ fi
 apply_patch_once "${SRC_DIR}/FAST_LIO_ROS2" \
   "${REPO_DIR}/patches/fast_lio_ros2.patch"
 
-sudo rosdep init 2>/dev/null || true
+"${ROOT_CMD[@]}" rosdep init 2>/dev/null || true
 rosdep update
 cd "${WORKSPACE_DIR}"
 rosdep install --from-paths src --ignore-src -r -y

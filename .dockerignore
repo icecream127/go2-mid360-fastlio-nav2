@@ -1,0 +1,11 @@
+.git
+.gitignore
+build
+install
+log
+dependency_backups
+**/__pycache__
+**/*.pyc
+.gazebo
+*.bag
+*.db3
