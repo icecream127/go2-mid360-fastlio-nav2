@@ -1,133 +1,119 @@
-# Go2 + MID-360：Gazebo 三维建图、重定位与导航
+# Unitree Go2 + Livox MID-360 + FAST-LIO + Nav2
 
-本项目基于 ROS 2 Humble、Gazebo Classic 和 CHAMP 四足控制器，为 Unitree Go2 仿真接入 MID-360 风格三维激光雷达，并实现 FAST-LIO 三维建图、基于 PCD 地图的 ICP 重定位和 Nav2 导航。
+本项目在 Ubuntu 22.04、ROS 2 Humble 和 Gazebo Classic 11 中仿真 Unitree Go2 与 Livox MID-360，并提供一套已经建好的地图。完成安装后，可以直接启动 Gazebo 和 RViz，进行三维点云定位与 Nav2 目标点导航，不需要先自行建图。
 
-## 项目功能
+## 一、普通部署与使用
 
-- 在 Gazebo Classic 11 中仿真 Go2 与 MID-360；
-- 发布 `/livox/lidar` 三维 PointCloud2、`/livox/lidar_custom` Livox CustomMsg，以及用于 Nav2 的二维 `/scan`；
-- 使用 FAST-LIO 完成三维激光惯性里程计和 PCD 建图；
-- 使用 ICP 在已有 PCD 三维地图中进行重定位；
-- 使用 Nav2 完成路径规划、目标点导航和二维避障。
+### 1. 环境要求
 
-导航使用的 TF 坐标链如下：
+- Ubuntu 22.04（原生 Ubuntu 或 WSL2 均可）
+- ROS 2 Humble Desktop
+- 能正常显示 Gazebo 和 RViz 图形窗口
+- 安装过程需要网络和 `sudo` 权限
+
+### 2. 下载并自动安装
+
+打开 Ubuntu 终端，依次执行：
+
+```bash
+sudo apt update
+sudo apt install -y git
+
+mkdir -p ~/go2_ws/src
+cd ~/go2_ws/src
+git clone https://github.com/icecream127/go2-mid360-fastlio-nav2.git unitree-go2-ros2
+
+cd unitree-go2-ros2
+./tools/setup_mid360_dependencies.bash
+```
+
+安装脚本会自动完成以下工作：
+
+- 安装项目需要的 ROS 2 和系统依赖；
+- 下载固定版本的 Livox SDK2、Livox ROS 2 驱动、Livox Gazebo 插件和 FAST-LIO；
+- 应用 ROS 2 Humble 兼容补丁；
+- 编译整个 `~/go2_ws` 工作空间；
+- 把仓库附带的地图复制到 `~/go2_ws/maps`。
+
+终端出现下面这行就表示安装和编译完成：
+
+```text
+Dependencies and workspace build completed.
+```
+
+首次安装需要下载和编译多个项目，耗时取决于网络和电脑性能。如果网络临时中断，可重新运行同一个安装命令。
+
+### 3. 一条命令启动
+
+```bash
+cd ~/go2_ws
+./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash gui:=true show_rviz:=true
+```
+
+启动脚本会自动加载 ROS 2 环境和当前工作空间，不需要手动设置 `LD_LIBRARY_PATH`。等待 Gazebo 和 RViz 窗口出现，并让系统初始化一段时间。
+
+如果已有其他 Gazebo 或同类 ROS 2 仿真正在运行，请先将其关闭，避免端口、节点名和话题冲突。
+
+### 4. 在 RViz 中定位和导航
+
+1. 确认 Gazebo 中已经出现机器狗；
+2. 在 RViz 工具栏选择 **2D Pose Estimate**；
+3. 在地图中机器狗实际所在位置附近，拖出大致位置和朝向；
+4. 等待数秒，终端连续出现 `ICP accepted` 表示重定位成功；
+5. 选择 **Nav2 Goal**，在地图可通行区域拖出目标位置和朝向；
+6. 机器狗开始行走，RViz 左下角出现 `Feedback: reached` 表示到达目标。
+
+初始位置不需要完全准确，但不能与真实位置相差过大。当前使用的是 FAST-LIO + ICP 重定位，因此 RViz 面板显示 `Localization: inactive` 不代表定位失败，应以 `ICP accepted`、点云与地图对齐情况及导航结果为准。
+
+在启动仿真的终端按 `Ctrl+C` 即可停止。
+
+## 二、项目功能
+
+- 在 Gazebo Classic 11 中仿真 Unitree Go2 四足机器人；
+- 使用 Gazebo 射线传感器和 Livox 插件模拟 MID-360 风格的非重复扫描点云；
+- 发布 `/livox/lidar`（`PointCloud2`）和 `/livox/lidar_custom`（Livox `CustomMsg`）；
+- 使用 FAST-LIO 输出三维激光惯性里程计和三维 PCD 地图；
+- 使用已有 PCD 地图和实时三维点云进行 ICP 重定位；
+- 将三维点云转换为 `/scan`，供 Nav2 二维代价地图避障；
+- 使用 Nav2 完成路径规划、目标点导航和避障；
+- 提供默认 Gazebo 场景对应的三维地图与二维导航地图。
+
+导航使用的主要 TF 坐标链为：
 
 ```text
 map -> odom -> base_footprint -> base_link -> mid360_link
 ```
 
-其中 `/odom` 由 FAST-LIO 的 `/Odometry` 转换而来。主导航流程不使用 Gazebo 的 `/odom/ground_truth` 真值里程计。
+`/odom` 由 FAST-LIO 的 `/Odometry` 转换得到。主定位和导航流程不依赖 Gazebo 的 `/odom/ground_truth` 真值里程计，只需要使用者提供大致初始位置。
 
-## 运行环境
+## 三、使用已有地图或自行建图
 
-- Ubuntu 22.04
-- ROS 2 Humble
-- Gazebo Classic 11
-- 一个 ROS 2 工作空间，例如 `~/go2_ws`
+### 直接使用仓库地图
 
-## 快速开始：直接使用仓库随附地图导航
+仓库已经提供以下文件：
 
-仓库已包含与默认 Gazebo 场景 `mid360_mapping.world` 对应的三维 PCD 地图和 Nav2 二维地图。首次安装完成后，无需自行建图，即可直接启动仿真、重定位和导航。
-
-### 1. 首次安装
-
-在已安装 Ubuntu 22.04、ROS 2 Humble 和 Gazebo Classic 11 的终端中执行：
-
-```bash
-source /opt/ros/humble/setup.bash
-sudo apt update
-sudo apt install -y git
-mkdir -p ~/go2_ws/src
-cd ~/go2_ws/src
-git clone https://github.com/icecream127/go2-mid360-fastlio-nav2.git unitree-go2-ros2
-cd unitree-go2-ros2
-./tools/setup_mid360_dependencies.bash
+```text
+mid360_3d.pcd
+mid360_3d_nav.pgm
+mid360_3d_nav.yaml
 ```
 
-安装脚本会加载 Humble 环境、安装构建工具与 ROS 依赖，下载指定版本的 Livox SDK2、`livox_ros_driver2`、`livox_laser_simulation_ros2` 与 `FAST_LIO_ROS2`，自动应用项目补丁。SDK 先安装到当前工作空间的 `install/livox-sdk2`，驱动随后明确使用这份 SDK 编译，无需手动向 `/usr/local` 安装 SDK。安装过程需要网络和 sudo 权限，耗时取决于网络与电脑性能。
+默认启动命令会自动使用这些地图。导航模式不会覆盖已有地图。
 
-重复执行安装时，含有修改或未跟踪文件的第三方仓库（包括上次安装应用的补丁）会被完整移到工作空间的 `dependency_backups/` 下，终端会打印备份路径，然后重新下载固定版本。备份中的自定义修改不会自动合并。已有运行地图不会被安装脚本覆盖。
+这些地图只对应项目自带的 `mid360_mapping.world` 场景。更换 Gazebo 世界后，需要为新场景重新生成 PCD 地图和二维导航地图。
 
-### 2. 启动随附地图的重定位与导航
+### 自行进行三维建图
 
-```bash
-cd ~/go2_ws
-source /opt/ros/humble/setup.bash
-source install/setup.bash
+注意：下面的流程会更新 `~/go2_ws/maps/mid360_3d.pcd`。如果需要保留原地图，请先备份 `~/go2_ws/maps`。
 
-export GAZEBO_MODEL_DATABASE_URI=""
-export QT_QPA_PLATFORM=xcb
-
-./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash gui:=true show_rviz:=true
-```
-
-等待约半分钟，Gazebo 和 RViz 会依次打开。RViz 中的黑色障碍物地图就是仓库随附的完整二维导航地图。
-
-### 3. 在 RViz 中发送导航目标
-
-1. 选择工具栏的 **2D Pose Estimate**，在地图中机器狗实际出现的附近拖出一个大概的初始位置与朝向；
-2. 等待数秒，让 ICP 与 FAST-LIO 点云定位稳定；
-3. 选择 **Nav2 Goal**，在可通行区域拖出目标位置和朝向；
-4. 左下角显示 `Feedback: reached` 即表示到达。
-
-按启动终端的 `Ctrl+C` 可停止仿真。
-
-导航模式关闭 FAST-LIO 的 PCD 自动保存，退出导航不会用本次扫描覆盖已有定位地图。只有主动运行后面的建图流程才会保存新地图。
-
-安装完成的标志是终端显示 `Dependencies and workspace build completed.`。使用前关闭其他工作空间运行的同类仿真，避免同名话题和 Gazebo 端口冲突。当前定位使用 FAST-LIO + ICP，RViz 面板的 `Localization: inactive` 不能单独判定 ICP 是否工作；应结合终端的 `ICP accepted` 日志和扫描与地图的对齐情况判断。
-
-> 随附地图只对应本项目默认的 Gazebo 场景。若更换 `.world` 场景，必须重新建图并生成对应的 PCD 与二维导航地图。
-
-## Docker 运行（Windows 10/11 + WSL2）
-
-Docker 镜像基于官方 `osrf/ros:humble-desktop-full-jammy`，镜像构建时会在隔离环境内下载固定版本依赖、编译 Livox SDK 和整个 ROS 2 工作空间。Gazebo 与 RViz 通过 WSLg 显示到 Windows 桌面。
-
-先在 Windows 安装 Docker Desktop，启用 **Use the WSL 2 based engine**，并在 **Settings → Resources → WSL Integration** 中开启当前 Ubuntu 发行版。然后在 WSL 终端确认：
-
-```bash
-docker version
-docker compose version
-```
-
-构建镜像：
-
-```bash
-cd ~/go2_ws/src/unitree-go2-ros2
-docker compose build
-```
-
-首次构建会下载 ROS Desktop 镜像和所有源码，耗时较长且需要较多磁盘空间。成功后启动完整的随附地图导航：
-
-```bash
-docker compose up
-```
-
-Gazebo 和 RViz 打开后，仍按前面的 **2D Pose Estimate → 等待 ICP → Nav2 Goal** 顺序操作。在终端按 `Ctrl+C` 停止，然后执行：
-
-```bash
-docker compose down
-```
-
-容器中的 `/go2_ws/maps` 使用名为 `go2-maps` 的 Docker volume 持久保存，重新创建容器不会丢失地图。
-
-当前项目不需要 CUDA。默认设置 `LIBGL_ALWAYS_SOFTWARE=1`，优先保证 WSLg 图形兼容性。只有确认 Docker Desktop 已启用 NVIDIA GPU，并且后续加入了实际使用 CUDA 的算法时，才使用可选配置：
-
-```bash
-docker compose -f compose.yaml -f compose.cuda.yaml up
-```
-
-## 可选：自行建图
-
-### 1. 三维建图
-
-此可选流程会写入 `maps/mid360_3d.pcd`，需要保留原地图时请先备份 `maps/`。仅体验随附地图导航时无需执行。
+启动三维建图：
 
 ```bash
 cd ~/go2_ws
 ./src/unitree-go2-ros2/tools/run_fast_lio_3d_mapping.bash gui:=true show_rviz:=true
 ```
 
-另开终端后可用键盘控制机器人运动：
+另开一个终端，用键盘控制机器狗：
 
 ```bash
 cd ~/go2_ws
@@ -136,15 +122,9 @@ source install/setup.bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
-建图结束时，在第一个终端按 `Ctrl+C`。配置的三维地图输出路径为：
+完成环境扫描后，在建图终端按 `Ctrl+C` 保存 PCD 地图。
 
-```text
-~/go2_ws/maps/mid360_3d.pcd
-```
-
-### 2. 从 PCD 生成 Nav2 二维地图
-
-Nav2 使用从三维点云指定高度范围投影得到的二维栅格地图：
+把 PCD 地图转换为 Nav2 二维地图：
 
 ```bash
 python3 ~/go2_ws/src/unitree-go2-ros2/robots/configs/go2_config/scripts/pcd_to_nav2_map.py \
@@ -153,43 +133,98 @@ python3 ~/go2_ws/src/unitree-go2-ros2/robots/configs/go2_config/scripts/pcd_to_n
   --min-points 2 --dilation-cells 1
 ```
 
-命令会生成相匹配的：
+转换完成后，再运行普通启动命令即可使用新地图导航。
 
-```text
-mid360_3d_nav.pgm
-mid360_3d_nav.yaml
-```
-
-### 3. 使用自行生成的地图导航
+也可以在启动时指定其他地图：
 
 ```bash
 cd ~/go2_ws
-./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash gui:=true show_rviz:=true
-```
-
-等待系统加载完成后，在 RViz 中：
-
-1. 使用 **2D Pose Estimate** 给机器人一个大概的初始位置与朝向；
-2. 等待 ICP 点云匹配稳定；
-3. 使用 **Nav2 Goal** 设置导航目标点。
-
-若需换用另一张地图，提供同一场景对应的 PCD 与二维投影地图：
-
-```bash
 ./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash \
   gui:=true show_rviz:=true \
   pcd_map:=$HOME/go2_ws/maps/example.pcd \
   nav_map:=$HOME/go2_ws/maps/example_nav.yaml
 ```
 
-## 已知限制
+PCD、PGM 和 YAML 必须来自同一个场景，并且坐标原点需要保持一致。
 
-- 当前使用的是 Gazebo Classic 射线模型模拟的 MID-360 风格点云，并非真实 MID-360 硬件驱动，也不是硬件级精度的传感器仿真；
-- ICP 需要相对合理的人工初始位姿；在高度对称、特征不足或地图变化很大的场景中可能匹配失败；
-- Nav2 使用 PCD 的二维高度切片进行规划和避障，FAST-LIO 与 ICP 仍是三维定位来源。
+## 四、已知限制
 
-## 可复现性说明
+- 当前是 Gazebo 中的 MID-360 风格传感器仿真，不是真实 MID-360 硬件，也不是硬件级精度的数字孪生；
+- ICP 需要相对合理的人工初始位置；在场景高度对称、特征太少或地图与环境差异很大时，可能无法正确收敛；
+- FAST-LIO 和 ICP 使用三维点云定位，但 Nav2 的路径规划与局部避障仍基于二维地图和二维 `/scan`；
+- WSL2 的 Gazebo/RViz 显示依赖 WSLg 和显卡驱动，图形性能通常低于原生 Ubuntu。
 
-`patches/` 保存了本项目对指定版本 Livox Gazebo 插件和 FAST-LIO 的必要补丁：它们分别补充 FAST-LIO 所需的 Livox CustomMsg，并保证在 `Ctrl+C` 结束建图时保存完整 PCD 地图。安装脚本同时处理 Livox ROS 驱动在 ROS 2 Humble 下的构建兼容性。
+## 五、开源项目说明
 
-本项目建立在 Unitree Go2 description、CHAMP、Livox SDK2、`livox_ros_driver2`、LCAS `livox_laser_simulation_ros2` 与 `FAST_LIO_ROS2` 等开源项目之上，相关源码分别遵循其原始许可证。
+本项目基于 Unitree Go2 description、CHAMP、Livox SDK2、`livox_ros_driver2`、LCAS `livox_laser_simulation_ros2` 和 `FAST_LIO_ROS2` 等开源项目开发，各部分遵循其原始许可证。
+
+`patches/` 保存了针对固定依赖版本的必要补丁，用于补充 Livox `CustomMsg` 输出、适配 ROS 2 Humble，并保证 FAST-LIO 在结束建图时保存完整 PCD 地图。
+
+## 六、Docker 部署
+
+Docker 方式适合希望隔离 ROS 依赖，或者需要把相同运行环境交给其他人的情况。Docker 镜像内部已经包含 Ubuntu 22.04、ROS 2 Humble、Livox 依赖、FAST-LIO 和本项目工作空间。
+
+### Windows 10/11 + WSL2 准备
+
+1. 安装并启动 Docker Desktop；
+2. 启用 **Use the WSL 2 based engine**；
+3. 在 **Settings → Resources → WSL Integration** 中启用要使用的 Ubuntu 22.04；
+4. 在 Ubuntu 终端确认 Docker 可用：
+
+```bash
+docker version
+docker compose version
+```
+
+原生 Ubuntu 22.04 可以直接安装 Docker Engine 和 Docker Compose，不需要 WSL Integration。
+
+### 下载项目
+
+如果还没有克隆项目：
+
+```bash
+mkdir -p ~/go2_docker
+cd ~/go2_docker
+git clone https://github.com/icecream127/go2-mid360-fastlio-nav2.git
+cd go2-mid360-fastlio-nav2
+```
+
+如果已经按照普通部署克隆过项目，直接进入原仓库：
+
+```bash
+cd ~/go2_ws/src/unitree-go2-ros2
+```
+
+### 构建镜像
+
+```bash
+docker compose build
+```
+
+首次构建会下载 ROS 镜像、依赖源码并完成编译，耗时较长。最终镜像约为 2 GB。
+
+### 启动导航仿真
+
+```bash
+docker compose up
+```
+
+Gazebo 和 RViz 出现后，仍按照以下顺序操作：
+
+```text
+2D Pose Estimate -> 等待 ICP accepted -> Nav2 Goal
+```
+
+停止时在当前终端按 `Ctrl+C`，然后执行：
+
+```bash
+docker compose down
+```
+
+不要随意执行 `docker compose down -v`，因为 `-v` 会同时删除保存地图的 `go2-maps` 数据卷。
+
+当前项目运行不需要 CUDA。默认使用软件 OpenGL，以提高 WSLg 下 Gazebo 和 RViz 的兼容性。如果以后加入了需要 CUDA 的算法，并且 Docker Desktop 已启用 NVIDIA GPU，可使用：
+
+```bash
+docker compose -f compose.yaml -f compose.cuda.yaml up
+```
