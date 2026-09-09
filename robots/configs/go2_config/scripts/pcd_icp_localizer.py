@@ -4,6 +4,7 @@
 import math
 import os
 import time
+from collections import deque
 
 import numpy as np
 import rclpy
@@ -239,6 +240,7 @@ class PcdIcpLocalizer(Node):
         self.declare_parameter("max_correspondence_distance", 1.0)
         self.declare_parameter("localization_period", 1.0)
         self.declare_parameter("maximum_accepted_rmse", 0.45)
+        self.declare_parameter("scan_history_size", 15)
 
         self.map_frame = self.get_parameter("map_frame").value
         self.local_frame = self.get_parameter("local_frame").value
@@ -259,6 +261,9 @@ class PcdIcpLocalizer(Node):
         )
         self.maximum_rmse = float(
             self.get_parameter("maximum_accepted_rmse").value
+        )
+        self.scan_history = deque(
+            maxlen=int(self.get_parameter("scan_history_size").value)
         )
 
         self.get_logger().info(f"Loading PCD map: {map_file}")
@@ -361,6 +366,7 @@ class PcdIcpLocalizer(Node):
         self.map_to_local = map_to_body_guess @ np.linalg.inv(
             self.local_to_body
         )
+        self.scan_history.clear()
 
         self.get_logger().info(
             "Initial pose received; ICP localization enabled"
@@ -370,13 +376,20 @@ class PcdIcpLocalizer(Node):
         if self.map_to_local is None or self.local_to_body is None:
             return
 
+        current_scan = cloud_to_numpy(message)
+        if len(current_scan) > 0:
+            self.scan_history.append(current_scan)
+
         now = time.monotonic()
         if now - self.last_localization_time < self.localization_period:
             return
         self.last_localization_time = now
 
+        if not self.scan_history:
+            return
+
         source = voxel_downsample(
-            cloud_to_numpy(message),
+            np.concatenate(tuple(self.scan_history), axis=0),
             self.scan_voxel,
         )
 
