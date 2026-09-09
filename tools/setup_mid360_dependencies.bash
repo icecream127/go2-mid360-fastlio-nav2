@@ -57,6 +57,23 @@ apply_patch_once() {
   fi
 }
 
+retry_command() {
+  local maximum_attempts="$1"
+  local delay_seconds="$2"
+  shift 2
+
+  local attempt=1
+  until "$@"; do
+    if (( attempt >= maximum_attempts )); then
+      echo "Command failed after ${attempt} attempts: $*" >&2
+      return 1
+    fi
+    echo "Command failed (attempt ${attempt}/${maximum_attempts}); retrying in ${delay_seconds}s: $*" >&2
+    sleep "${delay_seconds}"
+    ((attempt += 1))
+  done
+}
+
 "${ROOT_CMD[@]}" apt update
 "${ROOT_CMD[@]}" apt install -y \
   git build-essential cmake python3-colcon-common-extensions \
@@ -110,7 +127,7 @@ apply_patch_once "${SRC_DIR}/FAST_LIO_ROS2" \
   "${REPO_DIR}/patches/fast_lio_ros2.patch"
 
 "${ROOT_CMD[@]}" rosdep init 2>/dev/null || true
-rosdep update
+retry_command 3 5 rosdep update
 cd "${WORKSPACE_DIR}"
 rosdep install --from-paths src --ignore-src -r -y
 # Build the SDK first into this workspace.  The driver otherwise finds an
