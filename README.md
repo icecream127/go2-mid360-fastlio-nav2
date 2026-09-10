@@ -2,6 +2,12 @@
 
 本项目在 Ubuntu 22.04、ROS 2 Humble 和 Gazebo Classic 11 中仿真 Unitree Go2 与 Livox MID-360，并提供一套已经建好的地图。完成安装后，可以直接启动 Gazebo 和 RViz，进行三维点云定位与 Nav2 目标点导航，不需要先自行建图。
 
+## 演示视频
+
+[▶ 点击观看：Go2 + MID-360 + FAST-LIO + Nav2 仿真演示](docs/demo/go2_mid360_fastlio_nav2_demo.mp4)
+
+视频展示了项目在 Gazebo 和 RViz 中的实际运行效果。若 GitHub 页面没有直接播放，请点击链接后选择 **View raw** 或下载视频观看。
+
 ## 一、普通部署与使用
 
 ### 1. 环境要求
