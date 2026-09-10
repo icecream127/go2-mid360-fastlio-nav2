@@ -6,6 +6,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Time
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -20,6 +21,11 @@ def generate_launch_description():
     mapping_rviz = LaunchConfiguration("mapping_rviz")
     use_sim_time = LaunchConfiguration("use_sim_time")
     map_file = LaunchConfiguration("map_file")
+    auto_initial_pose = LaunchConfiguration("auto_initial_pose")
+    auto_initial_delay = LaunchConfiguration("auto_initial_delay")
+    initial_x = LaunchConfiguration("initial_x")
+    initial_y = LaunchConfiguration("initial_y")
+    initial_yaw = LaunchConfiguration("initial_yaw")
 
     fast_lio_stack = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -57,6 +63,15 @@ def generate_launch_description():
             {
                 "use_sim_time": use_sim_time,
                 "map_file": map_file,
+                "auto_initialize": ParameterValue(
+                    auto_initial_pose, value_type=bool
+                ),
+                "auto_initialize_delay": ParameterValue(
+                    auto_initial_delay, value_type=float
+                ),
+                "initial_x": ParameterValue(initial_x, value_type=float),
+                "initial_y": ParameterValue(initial_y, value_type=float),
+                "initial_yaw": ParameterValue(initial_yaw, value_type=float),
             }
         ],
     )
@@ -73,6 +88,11 @@ def generate_launch_description():
             DeclareLaunchArgument("show_rviz", default_value="true"),
             DeclareLaunchArgument("mapping_rviz", default_value=show_rviz),
             DeclareLaunchArgument("use_sim_time", default_value="true"),
+            DeclareLaunchArgument("auto_initial_pose", default_value="true"),
+            DeclareLaunchArgument("auto_initial_delay", default_value="10.0"),
+            DeclareLaunchArgument("initial_x", default_value="0.0"),
+            DeclareLaunchArgument("initial_y", default_value="0.0"),
+            DeclareLaunchArgument("initial_yaw", default_value="0.0"),
             DeclareLaunchArgument(
                 "map_file",
                 default_value=os.path.join(

@@ -30,6 +30,11 @@ def generate_launch_description():
     pcd_map = LaunchConfiguration("pcd_map")
     nav_map = LaunchConfiguration("nav_map")
     params_file = LaunchConfiguration("params_file")
+    auto_initial_pose = LaunchConfiguration("auto_initial_pose")
+    auto_initial_delay = LaunchConfiguration("auto_initial_delay")
+    initial_x = LaunchConfiguration("initial_x")
+    initial_y = LaunchConfiguration("initial_y")
+    initial_yaw = LaunchConfiguration("initial_yaw")
 
     localization = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -41,6 +46,11 @@ def generate_launch_description():
             "mapping_rviz": "false",
             "use_sim_time": use_sim_time,
             "map_file": pcd_map,
+            "auto_initial_pose": auto_initial_pose,
+            "auto_initial_delay": auto_initial_delay,
+            "initial_x": initial_x,
+            "initial_y": initial_y,
+            "initial_yaw": initial_yaw,
         }.items(),
     )
 
@@ -94,6 +104,11 @@ def generate_launch_description():
         # overwrite their own `show_rviz` launch configuration.
         SetLaunchConfiguration("nav_rviz", show_rviz),
         DeclareLaunchArgument("use_sim_time", default_value="true"),
+        DeclareLaunchArgument("auto_initial_pose", default_value="true"),
+        DeclareLaunchArgument("auto_initial_delay", default_value="10.0"),
+        DeclareLaunchArgument("initial_x", default_value="0.0"),
+        DeclareLaunchArgument("initial_y", default_value="0.0"),
+        DeclareLaunchArgument("initial_yaw", default_value="0.0"),
         DeclareLaunchArgument(
             "pcd_map",
             default_value=os.path.join(
@@ -112,6 +127,10 @@ def generate_launch_description():
         ),
         localization,
         TimerAction(period=16.0, actions=[map_server, map_lifecycle]),
-        TimerAction(period=18.0, actions=[navigation]),
+        # Start Nav2 only after the delayed automatic ICP initialization has
+        # had time to create map -> odom.  Starting the lifecycle manager
+        # against two disconnected TF trees intermittently leaves the
+        # planner inactive, especially in fast headless simulations.
+        TimerAction(period=28.0, actions=[navigation]),
         TimerAction(period=22.0, actions=[rviz]),
     ])

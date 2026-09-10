@@ -50,20 +50,20 @@ cd ~/go2_ws
 ./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash gui:=true show_rviz:=true
 ```
 
-启动脚本会自动加载 ROS 2 环境和当前工作空间，不需要手动设置 `LD_LIBRARY_PATH`。等待 Gazebo 和 RViz 窗口出现，并让系统初始化一段时间。
+启动脚本会自动加载 ROS 2 环境和当前工作空间，不需要手动设置 `LD_LIBRARY_PATH`。等待 Gazebo 和 RViz 窗口出现；系统会先让机器狗站稳，再初始化 FAST-LIO。
 
 如果已有其他 Gazebo 或同类 ROS 2 仿真正在运行，请先将其关闭，避免端口、节点名和话题冲突。
 
-### 4. 在 RViz 中定位和导航
+启动脚本默认使用 Fast DDS 共享内存传输，以免高流量点云影响 Nav2 生命周期服务。如果所在环境不支持共享内存，可在启动命令前设置 `GO2_DDS_TRANSPORT=udp` 切换为 UDP。
+
+### 4. 在 RViz 中导航
 
 1. 确认 Gazebo 中已经出现机器狗；
-2. 在 RViz 工具栏选择 **2D Pose Estimate**；
-3. 在地图中机器狗实际所在位置附近，拖出大致位置和朝向；
-4. 等待数秒，终端连续出现 `ICP accepted` 表示重定位成功；
-5. 选择 **Nav2 Goal**，在地图可通行区域拖出目标位置和朝向；
-6. 机器狗开始行走，RViz 左下角出现 `Feedback: reached` 表示到达目标。
+2. 等待终端连续出现 `ICP accepted`，再等待 Nav2 完成启动（整个过程通常约半分钟）；
+3. 选择 **Nav2 Goal**，在地图可通行区域拖出目标位置和朝向；
+4. 机器狗开始行走，RViz 左下角出现 `Feedback: reached` 表示到达目标。
 
-初始位置不需要完全准确，但不能与真实位置相差过大。当前使用的是 FAST-LIO + ICP 重定位，因此 RViz 面板显示 `Localization: inactive` 不代表定位失败，应以 `ICP accepted`、点云与地图对齐情况及导航结果为准。
+默认场景会自动使用 `x=0、y=0、yaw=0` 作为 ICP 初始估计，不需要点击 **2D Pose Estimate**。当前使用的是 FAST-LIO + ICP 重定位，因此 RViz 面板显示 `Localization: inactive` 不代表定位失败，应以 `ICP accepted`、点云与地图对齐情况及导航结果为准。
 
 在启动仿真的终端按 `Ctrl+C` 即可停止。
 
@@ -84,7 +84,7 @@ cd ~/go2_ws
 map -> odom -> base_footprint -> base_link -> mid360_link
 ```
 
-`/odom` 由 FAST-LIO 的 `/Odometry` 转换得到。主定位和导航流程不依赖 Gazebo 的 `/odom/ground_truth` 真值里程计，只需要使用者提供大致初始位置。
+`/odom` 由 FAST-LIO 的 `/Odometry` 转换得到。默认场景使用已知出生点作为 ICP 初始估计，主定位和导航流程不依赖 Gazebo 的 `/odom/ground_truth` 真值里程计。
 
 ## 三、使用已有地图或自行建图
 
@@ -142,15 +142,16 @@ cd ~/go2_ws
 ./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash \
   gui:=true show_rviz:=true \
   pcd_map:=$HOME/go2_ws/maps/example.pcd \
-  nav_map:=$HOME/go2_ws/maps/example_nav.yaml
+  nav_map:=$HOME/go2_ws/maps/example_nav.yaml \
+  initial_x:=1.0 initial_y:=2.0 initial_yaw:=0.0
 ```
 
-PCD、PGM 和 YAML 必须来自同一个场景，并且坐标原点需要保持一致。
+把示例中的 `initial_x`、`initial_y` 和 `initial_yaw` 改成新地图中机器狗的固定出生位姿。若出生位置不固定，可增加 `auto_initial_pose:=false`，然后在 RViz 中使用 **2D Pose Estimate**。PCD、PGM 和 YAML 必须来自同一个场景，并且坐标原点需要保持一致。
 
 ## 四、已知限制
 
 - 当前是 Gazebo 中的 MID-360 风格传感器仿真，不是真实 MID-360 硬件，也不是硬件级精度的数字孪生；
-- ICP 需要相对合理的人工初始位置；在场景高度对称、特征太少或地图与环境差异很大时，可能无法正确收敛；
+- ICP 仍需要相对合理的初始估计；在出生位姿改变、场景高度对称、特征太少或地图与环境差异很大时，可能无法正确收敛；
 - FAST-LIO 和 ICP 使用三维点云定位，但 Nav2 的路径规划与局部避障仍基于二维地图和二维 `/scan`；
 - WSL2 的 Gazebo/RViz 显示依赖 WSLg 和显卡驱动，图形性能通常低于原生 Ubuntu。
 
@@ -209,10 +210,10 @@ docker compose build
 docker compose up
 ```
 
-Gazebo 和 RViz 出现后，仍按照以下顺序操作：
+Gazebo 和 RViz 出现后，按照以下顺序操作：
 
 ```text
-2D Pose Estimate -> 等待 ICP accepted -> Nav2 Goal
+等待 ICP accepted -> Nav2 Goal
 ```
 
 停止时在当前终端按 `Ctrl+C`，然后执行：

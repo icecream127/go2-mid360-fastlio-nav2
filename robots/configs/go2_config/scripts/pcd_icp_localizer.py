@@ -241,6 +241,11 @@ class PcdIcpLocalizer(Node):
         self.declare_parameter("localization_period", 1.0)
         self.declare_parameter("maximum_accepted_rmse", 0.45)
         self.declare_parameter("scan_history_size", 15)
+        self.declare_parameter("auto_initialize", False)
+        self.declare_parameter("auto_initialize_delay", 10.0)
+        self.declare_parameter("initial_x", 0.0)
+        self.declare_parameter("initial_y", 0.0)
+        self.declare_parameter("initial_yaw", 0.0)
 
         self.map_frame = self.get_parameter("map_frame").value
         self.local_frame = self.get_parameter("local_frame").value
@@ -264,6 +269,17 @@ class PcdIcpLocalizer(Node):
         )
         self.scan_history = deque(
             maxlen=int(self.get_parameter("scan_history_size").value)
+        )
+        self.auto_initial_pending = bool(
+            self.get_parameter("auto_initialize").value
+        )
+        self.auto_initial_not_before = time.monotonic() + float(
+            self.get_parameter("auto_initialize_delay").value
+        )
+        self.initial_x = float(self.get_parameter("initial_x").value)
+        self.initial_y = float(self.get_parameter("initial_y").value)
+        self.initial_yaw = float(
+            self.get_parameter("initial_yaw").value
         )
 
         self.get_logger().info(f"Loading PCD map: {map_file}")
@@ -339,10 +355,16 @@ class PcdIcpLocalizer(Node):
         self.broadcaster = TransformBroadcaster(self)
         self.create_timer(0.05, self.broadcast_transform)
         self.create_timer(2.0, self.publish_map)
+        self.create_timer(0.5, self.try_auto_initialize)
 
-        self.get_logger().info(
-            "Waiting for /Odometry and RViz /initialpose"
-        )
+        if self.auto_initial_pending:
+            self.get_logger().info(
+                "Waiting for /Odometry before automatic initial pose"
+            )
+        else:
+            self.get_logger().info(
+                "Waiting for /Odometry and RViz /initialpose"
+            )
 
     def on_odometry(self, message):
         self.local_to_body = pose_to_matrix(message.pose.pose)
@@ -355,6 +377,35 @@ class PcdIcpLocalizer(Node):
         """Store base_footprint -> base_link, including the body height."""
         self.footprint_to_base = pose_to_matrix(message.pose.pose)
 
+    def try_auto_initialize(self):
+        """Seed ICP once FAST-LIO odometry is ready.
+
+        The configured pose is a map-frame estimate, not Gazebo ground truth.
+        ICP still corrects it against the live registered point cloud.
+        """
+        if (
+            not self.auto_initial_pending
+            or self.local_to_body is None
+            or time.monotonic() < self.auto_initial_not_before
+        ):
+            return
+
+        message = PoseWithCovarianceStamped()
+        message.header.stamp = self.get_clock().now().to_msg()
+        message.header.frame_id = self.map_frame
+        message.pose.pose.position.x = self.initial_x
+        message.pose.pose.position.y = self.initial_y
+        message.pose.pose.orientation.z = math.sin(0.5 * self.initial_yaw)
+        message.pose.pose.orientation.w = math.cos(0.5 * self.initial_yaw)
+
+        self.auto_initial_pending = False
+        self.on_initial_pose(message)
+        self.get_logger().info(
+            "Automatic initial pose sent: "
+            f"x={self.initial_x:.3f}, y={self.initial_y:.3f}, "
+            f"yaw={self.initial_yaw:.3f} rad"
+        )
+
     def on_initial_pose(self, message):
         if self.local_to_body is None:
             self.get_logger().warning(
@@ -362,6 +413,7 @@ class PcdIcpLocalizer(Node):
             )
             return
 
+        self.auto_initial_pending = False
         map_to_body_guess = pose_to_matrix(message.pose.pose)
         self.map_to_local = map_to_body_guess @ np.linalg.inv(
             self.local_to_body

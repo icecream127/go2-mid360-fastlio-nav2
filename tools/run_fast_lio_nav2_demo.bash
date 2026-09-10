@@ -14,6 +14,10 @@ export GAZEBO_MODEL_DATABASE_URI=""
 export ALSOFT_DRIVERS="null"
 export QT_QPA_PLATFORM="xcb"
 export LD_LIBRARY_PATH="${WORKSPACE_DIR}/install/livox-sdk2/lib:${LD_LIBRARY_PATH:-}"
-export FASTRTPS_DEFAULT_PROFILES_FILE="${WORKSPACE_DIR}/install/go2_config/share/go2_config/config/fastdds_udp.xml"
+if [[ "${GO2_DDS_TRANSPORT:-default}" == "udp" ]]; then
+  export FASTRTPS_DEFAULT_PROFILES_FILE="${WORKSPACE_DIR}/install/go2_config/share/go2_config/config/fastdds_udp.xml"
+else
+  unset FASTRTPS_DEFAULT_PROFILES_FILE
+fi
 
 exec ros2 launch go2_config fast_lio_nav2_demo.launch.py "$@"

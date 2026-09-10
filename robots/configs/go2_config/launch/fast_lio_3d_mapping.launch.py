@@ -81,7 +81,12 @@ def generate_launch_description():
                 ),
             ),
             simulation,
-            TimerAction(period=8.0, actions=[fast_lio]),
+            # The CHAMP controller raises the robot from its spawn pose at
+            # about eight seconds.  Calibrating FAST-LIO's IMU during that
+            # motion produces a random gravity estimate and can make the
+            # odometry diverge immediately.  Let the robot stand and settle
+            # before collecting the initialization samples.
+            TimerAction(period=14.0, actions=[fast_lio]),
             TimerAction(period=12.0, actions=[rviz]),
         ]
     )
