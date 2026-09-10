@@ -37,12 +37,23 @@ clone_at_commit() {
     mv "${destination}" "${backup}/${name}"
     echo "Preserved modified dependency: ${backup}/${name}"
   fi
-  if [[ ! -d "${destination}/.git" ]]; then
-    git clone --recursive "${url}" "${destination}"
+  if [[ -e "${destination}" ]] && [[ ! -d "${destination}/.git" ]]; then
+    # A TLS failure can leave a partial, non-Git directory behind. Preserve
+    # it so the retry can start from a clean destination.
+    local incomplete_backup
+    mkdir -p "${WORKSPACE_DIR}/dependency_backups"
+    incomplete_backup="$(mktemp -d "${WORKSPACE_DIR}/dependency_backups/${name}.incomplete.XXXXXX")"
+    mv "${destination}" "${incomplete_backup}/${name}"
+    echo "Preserved incomplete dependency: ${incomplete_backup}/${name}"
   fi
-  git -C "${destination}" fetch --tags origin
+  if [[ ! -d "${destination}/.git" ]]; then
+    retry_git_clone 5 8 "${url}" "${destination}"
+  fi
+  retry_command 5 8 git -C "${destination}" -c http.version=HTTP/1.1 \
+    fetch --tags origin
   git -C "${destination}" checkout --detach "${commit}"
-  git -C "${destination}" submodule update --init --recursive
+  retry_command 5 8 git -C "${destination}" -c http.version=HTTP/1.1 \
+    submodule update --init --recursive
 }
 
 apply_patch_once() {
@@ -69,6 +80,28 @@ retry_command() {
       return 1
     fi
     echo "Command failed (attempt ${attempt}/${maximum_attempts}); retrying in ${delay_seconds}s: $*" >&2
+    sleep "${delay_seconds}"
+    ((attempt += 1))
+  done
+}
+
+retry_git_clone() {
+  local maximum_attempts="$1"
+  local delay_seconds="$2"
+  local url="$3"
+  local destination="$4"
+  local attempt=1
+
+  until git -c http.version=HTTP/1.1 clone --recursive \
+    "${url}" "${destination}"; do
+    if (( attempt >= maximum_attempts )); then
+      echo "Git clone failed after ${attempt} attempts: ${url}" >&2
+      return 1
+    fi
+    # Any pre-existing user directory was preserved before this function;
+    # this path can only be the partial checkout made by the failed attempt.
+    rm -rf -- "${destination}"
+    echo "Git clone failed (attempt ${attempt}/${maximum_attempts}); retrying in ${delay_seconds}s: ${url}" >&2
     sleep "${delay_seconds}"
     ((attempt += 1))
   done
