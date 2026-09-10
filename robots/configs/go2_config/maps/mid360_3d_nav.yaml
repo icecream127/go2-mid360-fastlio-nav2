@@ -1,6 +1,6 @@
 image: mid360_3d_nav.pgm
 resolution: 0.050000
-origin: [-8.400000, -7.300000, 0.0]
+origin: [-8.800000, -8.000000, 0.0]
 negate: 0
 occupied_thresh: 0.65
 free_thresh: 0.25
