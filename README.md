@@ -4,9 +4,9 @@
 
 ## 演示视频
 
-[▶ 点击观看：Go2 + MID-360 + FAST-LIO + Nav2 仿真演示](docs/demo/go2_mid360_fastlio_nav2_demo.mp4)
+![Go2 + MID-360 + FAST-LIO + Nav2 仿真演示](docs/demo/go2_mid360_fastlio_nav2_demo.gif)
 
-视频展示了项目在 Gazebo 和 RViz 中的实际运行效果。若 GitHub 页面没有直接播放，请点击链接后选择 **View raw** 或下载视频观看。
+上图展示了项目在 Gazebo 和 RViz 中的实际运行效果，包括已有地图定位和 Nav2 目标点导航。
 
 ## 一、普通部署与使用
 
