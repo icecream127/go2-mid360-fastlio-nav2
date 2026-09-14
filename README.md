@@ -53,10 +53,12 @@ Dependencies and workspace build completed.
 
 ```bash
 cd ~/go2_ws
-./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash gui:=true show_rviz:=true
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch go2_nav_bringup navigation.launch.py gui:=true show_rviz:=true
 ```
 
-启动脚本会自动加载 ROS 2 环境和当前工作空间，不需要手动设置 `LD_LIBRARY_PATH`。等待 Gazebo 和 RViz 窗口出现；系统会先让机器狗站稳，再初始化 FAST-LIO。
+等待 Gazebo 和 RViz 窗口出现；系统会先让机器狗站稳，再初始化 FAST-LIO。也可以继续使用 `./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash`，它会自动加载上述环境并调用同一个启动文件。
 
 如果已有其他 Gazebo 或同类 ROS 2 仿真正在运行，请先将其关闭，避免端口、节点名和话题冲突。
 
@@ -72,6 +74,30 @@ cd ~/go2_ws
 默认场景会自动使用 `x=0、y=0、yaw=0` 作为 ICP 初始估计，不需要点击 **2D Pose Estimate**。当前使用的是 FAST-LIO + ICP 重定位，因此 RViz 面板显示 `Localization: inactive` 不代表定位失败，应以 `ICP accepted`、点云与地图对齐情况及导航结果为准。
 
 在启动仿真的终端按 `Ctrl+C` 即可停止。
+
+## ROS 2 包结构与开发
+
+| 功能包 | 职责 |
+| --- | --- |
+| `go2_mid360_sim` | MID-360 Gazebo 启动、传感器参数和场景 |
+| `go2_fastlio_localization` | FAST-LIO 建图启动、ICP 节点、里程计桥接和地图转换 |
+| `go2_nav_bringup` | Nav2 总启动、导航参数、示例地图和 RViz |
+| `go2_config` | 原有 Go2 步态/关节配置，以及旧命令兼容入口 |
+| `go2_description`、`champ_*` | 原有机器人描述和第三方运动控制 |
+
+Python 节点通过 `ament_python` 的入口安装；仿真、导航启动包通过 `ament_cmake` 安装资源。修改包后，在工作空间重新构建并加载环境：
+
+```bash
+cd ~/go2_ws
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install --packages-select go2_config go2_mid360_sim go2_fastlio_localization go2_nav_bringup
+source install/setup.bash
+ros2 launch go2_nav_bringup navigation.launch.py gui:=true show_rviz:=true
+```
+
+建图入口为 `ros2 launch go2_nav_bringup mapping.launch.py`，定位入口为 `ros2 launch go2_nav_bringup localization.launch.py`。上述入口默认使用同一套仿真、定位参数；`tools/run_*.bash` 保留为快捷入口。旧 `go2_config` 主启动文件会转发到新包。
+
+旧解析式点云和真值辅助脚本仍保留在 `go2_config/scripts` 中，仅用于历史实验兼容；默认导航入口不启用它们。自定义包从原工程迁移的文件继续保留原有版权与许可，第三方代码及许可证仍位于原目录。
 
 ## 二、项目功能
 
@@ -133,7 +159,7 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 把 PCD 地图转换为 Nav2 二维地图：
 
 ```bash
-python3 ~/go2_ws/src/unitree-go2-ros2/robots/configs/go2_config/scripts/pcd_to_nav2_map.py \
+ros2 run go2_fastlio_localization pcd_to_nav2_map \
   ~/go2_ws/maps/mid360_3d.pcd ~/go2_ws/maps/mid360_3d_nav \
   --resolution 0.05 --z-min 0.35 --z-max 1.50 --padding 0.30 \
   --min-points 2 --dilation-cells 1

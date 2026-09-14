@@ -20,4 +20,4 @@ else
   unset FASTRTPS_DEFAULT_PROFILES_FILE
 fi
 
-exec ros2 launch go2_config fast_lio_nav2_demo.launch.py "$@"
+exec ros2 launch go2_nav_bringup navigation.launch.py "$@"

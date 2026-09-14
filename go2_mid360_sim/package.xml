@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>go2_mid360_sim</name>
+  <version>0.2.0</version>
+  <description>go2 mid360 sim for the Go2 MID360 FAST-LIO Nav2 project.</description>
+  <maintainer email="icecream127@users.noreply.github.com">icecream127</maintainer>
+  <license>BSD-3-Clause</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>go2_config</exec_depend>
+  <exec_depend>go2_description</exec_depend>
+  <exec_depend>champ_bringup</exec_depend>
+  <exec_depend>champ_gazebo</exec_depend>
+  <exec_depend>ros2_livox_simulation</exec_depend>
+  <exec_depend>pointcloud_to_laserscan</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

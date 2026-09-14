@@ -32,4 +32,4 @@ export QT_QPA_PLATFORM="xcb"
 # Livox-SDK2 does not currently install an environment hook of its own.
 export LD_LIBRARY_PATH="${WORKSPACE_DIR}/install/livox-sdk2/lib:${LD_LIBRARY_PATH:-}"
 
-exec ros2 launch go2_config gazebo_mid360.launch.py "$@"
+exec ros2 launch go2_mid360_sim simulation.launch.py "$@"

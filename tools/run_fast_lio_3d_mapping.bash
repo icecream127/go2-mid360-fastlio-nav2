@@ -16,4 +16,4 @@ export QT_QPA_PLATFORM="xcb"
 export LD_LIBRARY_PATH="${WORKSPACE_DIR}/install/livox-sdk2/lib:${LD_LIBRARY_PATH:-}"
 export FASTRTPS_DEFAULT_PROFILES_FILE="${WORKSPACE_DIR}/install/go2_config/share/go2_config/config/fastdds_udp.xml"
 
-exec ros2 launch go2_config fast_lio_3d_mapping.launch.py "$@"
+exec ros2 launch go2_fastlio_localization mapping.launch.py "$@"

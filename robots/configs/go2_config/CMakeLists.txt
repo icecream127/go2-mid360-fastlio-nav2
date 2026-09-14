@@ -22,4 +22,13 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+# Compatibility resources for legacy launch files. The canonical maps are
+# maintained in go2_nav_bringup; do not keep a second copy in this package.
+install(FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../go2_nav_bringup/maps/mid360_3d.pcd
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../go2_nav_bringup/maps/mid360_3d_nav.pgm
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../go2_nav_bringup/maps/mid360_3d_nav.yaml
+  DESTINATION share/${PROJECT_NAME}/maps
+)
+
 ament_package()
