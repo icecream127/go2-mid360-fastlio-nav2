@@ -9,3 +9,4 @@ dependency_backups
 .gazebo
 *.bag
 *.db3
+docs/demo/

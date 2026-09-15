@@ -9,7 +9,9 @@ services:
     stdin_open: true
     tty: true
     shm_size: 2gb
+    command: ["ros2", "launch", "go2_nav_bringup", "navigation.launch.py", "gui:=${GO2_GUI:-true}", "show_rviz:=${GO2_RVIZ:-true}"]
     environment:
+      GO2_DDS_TRANSPORT: "${GO2_DDS_TRANSPORT:-default}"
       DISPLAY: "${DISPLAY:-:0}"
       WAYLAND_DISPLAY: "${WAYLAND_DISPLAY:-wayland-0}"
       XDG_RUNTIME_DIR: /mnt/wslg/runtime-dir

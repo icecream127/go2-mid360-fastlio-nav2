@@ -236,11 +236,39 @@ docker compose build
 
 首次构建会下载 ROS 镜像、依赖源码并完成编译，耗时较长。最终镜像约为 2 GB。
 
+镜像会编译并检查 `go2_mid360_sim`、`go2_fastlio_localization` 和 `go2_nav_bringup`。
+如果使用的是拆包前构建的旧镜像，更新仓库后执行：
+
+```bash
+git pull --ff-only
+docker compose up --build
+```
+
+该命令会重建并启动更新后的容器，保留地图数据卷。容器直接运行
+`ros2 launch go2_nav_bringup navigation.launch.py`，由入口脚本加载 ROS 和 Livox 库环境。
+
 ### 启动导航仿真
 
 ```bash
 docker compose up
 ```
+
+仅运行后台仿真、不打开窗口时：
+
+```bash
+GO2_GUI=false GO2_RVIZ=false docker compose up
+```
+
+也可以用同一镜像启动建图：
+
+```bash
+docker compose down
+docker compose run --rm go2-nav ros2 launch go2_nav_bringup mapping.launch.py gui:=true show_rviz:=true
+```
+
+建图会使用相同的地图卷，操作前请备份已有地图。参考地图位于镜像中
+`go2_nav_bringup` 的安装资源目录；空地图卷会自动初始化，已有地图不会因为
+重建镜像而被覆盖。要使用自己后续建的新地图，需要同步成套的 PCD、PGM 和 YAML。
 
 Gazebo 和 RViz 出现后，按照以下顺序操作：
 
