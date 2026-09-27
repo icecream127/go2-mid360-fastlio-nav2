@@ -125,8 +125,11 @@ clone_at_commit livox_ros_driver2 https://github.com/Livox-SDK/livox_ros_driver2
   13eb05e4e6dd7a765b934d0c5fd6236676a57b49
 clone_at_commit livox_laser_simulation_ros2 https://github.com/LCAS/livox_laser_simulation_ros2.git \
   dbac363e867676efbe7394df32fc3a90f4dfa35e
-clone_at_commit FAST_LIO_ROS2 https://github.com/Ericsii/FAST_LIO_ROS2.git \
-  2fffc570a25d0df172720bac034fbdb6a13d2162
+clone_at_commit FAST_LIO https://github.com/XjuHurricaneQuadVision/FAST_LIO.git \
+  440a8e3e909023b7cb084e99b0c5070e3baebe86
+# Keep the real-localization package buildable on a fresh clone.  This helper
+# pins the CPU-only fast_gicp checkout without fetching unused CUDA submodules.
+bash "${REPO_DIR}/go2_real_localization/tools/setup_fast_gicp.bash" "${WORKSPACE_DIR}"
 
 # Livox keeps the ROS 2 manifest under this nonstandard filename.  Colcon
 # only recognizes package.xml, so create the expected local copy.
@@ -156,8 +159,15 @@ if ! grep -q 'Ensure generated Livox message headers are available' \
   target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp")\
 ' "${SRC_DIR}/livox_ros_driver2/CMakeLists.txt"
 fi
-apply_patch_once "${SRC_DIR}/FAST_LIO_ROS2" \
-  "${REPO_DIR}/patches/fast_lio_ros2.patch"
+# Keep unsynchronized MID-360 packet timestamps tied to the device clock so
+# host wall-clock corrections cannot reverse LiDAR/IMU time.
+apply_patch_once "${SRC_DIR}/livox_ros_driver2" \
+  "${REPO_DIR}/patches/livox_driver2_monotonic_clock.patch"
+# Keep cumulative map output and apply handheld stability fixes to the pinned fork.
+apply_patch_once "${SRC_DIR}/FAST_LIO" \
+  "${REPO_DIR}/patches/fast_lio_handheld.patch"
+apply_patch_once "${SRC_DIR}/FAST_LIO" \
+  "${REPO_DIR}/patches/fast_lio_timestamp_guard.patch"
 
 "${ROOT_CMD[@]}" rosdep init 2>/dev/null || true
 retry_command 3 5 rosdep update

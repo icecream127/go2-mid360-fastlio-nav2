@@ -1,0 +1,48 @@
+# Real MID-360 profile for XjuHurricaneQuadVision/FAST_LIO 440a8e3.
+# Tune this file, not the dependency's example config.
+/**:
+  ros__parameters:
+    feature_extract_enable: false
+    point_filter_num: 2
+    max_iteration: 3
+    filter_size_surf: 0.1
+    filter_size_map: 0.1
+    #原来是0.1
+    # Local-map width, NOT maximum lidar distance. Must exceed 3 * det_range.
+    cube_side_length: 200.0
+    runtime_pos_log_enable: false
+    map_file_path: "./test.pcd"
+    common:
+      lid_topic: /livox/lidar
+      imu_topic: /livox/imu
+      time_sync_en: false
+      time_offset_lidar_to_imu: 0.0
+    preprocess:
+      lidar_type: 1
+      scan_line: 4
+      blind: 0.8
+      # 0.7差不多
+      timestamp_unit: 3
+      scan_rate: 10
+    mapping:
+      acc_cov: 0.1
+      gyr_cov: 0.1
+      b_acc_cov: 0.0001
+      b_gyr_cov: 0.0001
+      fov_degree: 360.0
+      # Used in local-map management; upstream does not enforce a hard 40 m crop.
+      det_range: 40.0
+      extrinsic_est_en: false  # Use the configured MID360 LiDAR-IMU extrinsic; disable online estimation.
+      extrinsic_T: [-0.011, -0.02329, 0.04412]
+      extrinsic_R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    publish:
+      path_en: true
+      effect_map_en: false
+      map_en: true
+      scan_publish_en: true
+      dense_publish_en: true
+      scan_bodyframe_pub_en: true
+    pcd_save:
+      # Save explicitly with ros2 run go2_fastlio_localization save_live_map.
+      pcd_save_en: false
+      interval: -1

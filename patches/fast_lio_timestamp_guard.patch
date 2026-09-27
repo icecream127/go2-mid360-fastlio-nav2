@@ -1,0 +1,42 @@
+diff --git a/src/laserMapping.cpp b/src/laserMapping.cpp
+--- a/src/laserMapping.cpp
++++ b/src/laserMapping.cpp
+@@ -288,8 +288,12 @@ void standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::UniquePtr msg)
+     double preprocess_start_time = omp_get_wtime();
+     if (!is_first_lidar && cur_time < last_timestamp_lidar)
+     {
+-        std::cerr << "lidar loop back, clear buffer" << std::endl;
++        std::cerr << "LiDAR timestamp moved backward by "
++                  << (last_timestamp_lidar - cur_time)
++                  << " s; clear LiDAR and time buffers" << std::endl;
+         lidar_buffer.clear();
++        time_buffer.clear();
++        lidar_pushed = false;
+     }
+     if (is_first_lidar)
+     {
+@@ -316,8 +320,12 @@ void livox_pcl_cbk(const livox_ros_driver2::msg::CustomMsg::UniquePtr msg)
+     scan_count ++;
+     if (!is_first_lidar && cur_time < last_timestamp_lidar)
+     {
+-        std::cerr << "lidar loop back, clear buffer" << std::endl;
++        std::cerr << "LiDAR timestamp moved backward by "
++                  << (last_timestamp_lidar - cur_time)
++                  << " s; clear LiDAR and time buffers" << std::endl;
+         lidar_buffer.clear();
++        time_buffer.clear();
++        lidar_pushed = false;
+     }
+     if(is_first_lidar)
+     {
+@@ -367,7 +375,9 @@ void imu_cbk(const sensor_msgs::msg::Imu::UniquePtr msg_in)
+ 
+     if (timestamp < last_timestamp_imu)
+     {
+-        std::cerr << "lidar loop back, clear buffer" << std::endl;
++        std::cerr << "IMU timestamp moved backward by "
++                  << (last_timestamp_imu - timestamp)
++                  << " s; clear IMU buffer" << std::endl;
+         imu_buffer.clear();
+     }
+ 

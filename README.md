@@ -1,6 +1,10 @@
 # Unitree Go2 + Livox MID-360 + FAST-LIO + Nav2
 
-本项目在 Ubuntu 22.04、ROS 2 Humble 和 Gazebo Classic 11 中仿真 Unitree Go2 与 Livox MID-360，并提供一套已经建好的地图。完成安装后，可以直接启动 Gazebo 和 RViz，进行三维点云定位与 Nav2 目标点导航，不需要先自行建图。
+> **真实 MID-360 当前使用 Xju 新版 FAST-LIO：请按 [真实雷达使用与参数入口](README_REAL_MID360.md) 操作。**
+> 旧真实雷达操作记录已归档；下面的仿真导航说明为原有流程，新算法坐标系改变后尚未回归验收。
+> 本轮代码、WSL 时钟修改和未完成的验收见 [2026-09-27 变更记录](docs/CHANGELOG_2026-09-27.md)。
+
+本项目在 Ubuntu 22.04、ROS 2 Humble 和 Gazebo Classic 11 中仿真 Unitree Go2 与 Livox MID-360，并提供一套已经建好的地图。原流程可启动 Gazebo 和 RViz，进行三维点云定位与 Nav2 目标点导航，不需要先自行建图；本轮更换 FAST-LIO 依赖后，仿真端到端运行尚待重新验证。
 
 ## 演示视频
 
@@ -37,6 +41,7 @@ cd unitree-go2-ros2
 
 - 安装项目需要的 ROS 2 和系统依赖；
 - 下载固定版本的 Livox SDK2、Livox ROS 2 驱动、Livox Gazebo 插件和 FAST-LIO；
+- 下载固定版本的 CPU `fast_gicp`，供独立的真实雷达 GICP 定位包构建；
 - 应用 ROS 2 Humble 兼容补丁；
 - 编译整个 `~/go2_ws` 工作空间；
 - 把仓库附带的地图复制到 `~/go2_ws/maps`。
@@ -53,6 +58,34 @@ ros2 launch go2_nav_bringup navigation.launch.py gui:=true show_rviz:=true
 等待 Gazebo 和 RViz 窗口出现；系统会先让机器狗站稳，再初始化 FAST-LIO。也可以继续使用 `./src/unitree-go2-ros2/tools/run_fast_lio_nav2_demo.bash`，它会自动加载上述环境并调用同一个启动文件。
 
 如果已有其他 Gazebo 或同类 ROS 2 仿真正在运行，请先将其关闭，避免端口、节点名和话题冲突。
+
+导航不会调用建图启动文件：它启动仿真、FAST-LIO 里程计、ICP 定位和 Nav2。
+FAST-LIO 的程序名仍为 `fastlio_mapping`，导航中的节点名为 `fastlio_odometry`；
+算法内部仍维护里程计匹配所需的局部地图，但不发布 FAST-LIO 地图、不保存 PCD，
+也不会覆盖已有参考地图。需要主动建图时才使用 `go2_nav_bringup mapping.launch.py`。
+
+#### 调参入口与地图选择
+
+- 默认读取当前工作空间的 `maps/mid360_3d.pcd` 和 `maps/mid360_3d_nav.yaml`，
+  启动日志会打印实际路径。包中的地图是安装时的分发副本，修改它不会自动替换工作空间地图。
+  换地图时显式传入 `pcd_map:=/绝对路径/地图.pcd nav_map:=/绝对路径/地图.yaml`，
+  两者必须来自同一坐标系。
+- `initial_x / initial_y / initial_yaw` 是地图坐标系下的 ICP 初猜；
+  `world_init_x / world_init_y / world_init_z / world_init_heading` 是 Gazebo 出生位姿。
+  两组参数不能默认照抄，朝向单位都是弧度。
+- 点云转扫描配置为 `go2_mid360_sim/config/mid360_to_scan.yaml`，
+  节点名为 `mid360_cloud_to_scan`。启动参数 `use_sim_time` 会覆盖该 YAML 中的时间设置。
+  当前按雷达坐标系上方 0.02～1.50 m 取截面，仅针对墙柱平地演示，
+  不能保证低矮障碍物检出，也不是通用地面分割。
+  本轮已发现空扫描帧及定位精度待验证项，详见 [验收记录](docs/NAVIGATION_PARAMETER_AUDIT.md)。
+- 当前使用 ICP，不启动 AMCL；导航参数文件中已移除未使用的 AMCL 段。
+- 路径控制器、恢复旋转、速度平滑器和 CHAMP 的角速度上限统一为 0.5 rad/s。
+  前三项位于 `go2_nav_bringup/config/autonomy/fast_lio_nav2.yaml`，
+  CHAMP 位于 `robots/configs/go2_config/config/gait/gait.yaml`。
+- 仿真关节 PID 的有效入口为
+  `robots/descriptions/go2_description/config/ros_control/ros_control.yaml`，
+  由模型中的 Gazebo 插件加载；不是 `go2_config` 下的同名文件。
+  修改参数后请重新编译对应包并重启相关节点。
 
 启动脚本默认使用 Fast DDS 共享内存传输，以免高流量点云影响 Nav2 生命周期服务。如果所在环境不支持共享内存，可在启动命令前设置 `GO2_DDS_TRANSPORT=udp` 切换为 UDP。
 
@@ -73,6 +106,7 @@ ros2 launch go2_nav_bringup navigation.launch.py gui:=true show_rviz:=true
 | --- | --- |
 | `go2_mid360_sim` | MID-360 Gazebo 启动、传感器参数和场景 |
 | `go2_fastlio_localization` | FAST-LIO 建图启动、ICP 节点、里程计桥接和地图转换 |
+| `go2_real_localization` | 真实 MID-360 的已有 PCD 地图 GICP 重定位；[单独使用说明](go2_real_localization/README.md) |
 | `go2_nav_bringup` | Nav2 总启动、导航参数、示例地图和 RViz |
 | `go2_config` | 原有 Go2 步态/关节配置，以及旧命令兼容入口 |
 | `go2_description`、`champ_*` | 原有机器人描述和第三方运动控制 |
@@ -128,7 +162,9 @@ mid360_3d_nav.yaml
 
 ### 自行进行三维建图
 
-注意：下面的流程会更新 `~/go2_ws/maps/mid360_3d.pcd`。如果需要保留原地图，请先备份 `~/go2_ws/maps`。
+下面的流程不会自动覆盖仓库附带的 `mid360_3d.pcd`。当前 Xju FAST-LIO
+检出的关机保存缓冲没有填充，**按 Ctrl+C 不会可靠地保存 PCD**；
+必须在建图节点仍运行时另行保存，并确认工具打印 `SAVED`。
 
 启动三维建图：
 
@@ -146,18 +182,28 @@ source install/setup.bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
-完成环境扫描后，在建图终端按 `Ctrl+C` 保存 PCD 地图。
+完成环境扫描后，保持建图终端运行，在另一个已 `source` 工作空间的终端保存：
 
-把 PCD 地图转换为 Nav2 二维地图：
+```bash
+ros2 run go2_fastlio_localization save_live_map
+```
+
+工具默认写入 `~/go2_maps/real_room_时间戳.pcd`，并打印准确的 `SAVED` 路径。
+确认文件存在且点数合理后，再在建图终端按 `Ctrl+C`。文件名中的
+`real_room` 是保存工具的通用命名，在这里不代表该数据来自真实雷达。
+
+把刚打印的 PCD 路径代入下列命令，转换为 Nav2 二维地图：
 
 ```bash
 ros2 run go2_fastlio_localization pcd_to_nav2_map \
-  ~/go2_ws/maps/mid360_3d.pcd ~/go2_ws/maps/mid360_3d_nav \
+  /home/ice/go2_maps/real_room_实际时间戳.pcd /home/ice/go2_maps/my_room_nav \
   --resolution 0.05 --z-min 0.35 --z-max 1.50 --padding 0.30 \
   --min-points 2 --dilation-cells 1
 ```
 
-转换完成后，再运行普通启动命令即可使用新地图导航。
+转换完成后，启动导航时显式传入新 PCD 的 `pcd_map` 和新 YAML 的
+`nav_map`，不要误用工作空间默认的旧地图。二维投影需要人工检查障碍物和
+未观测区域；未验证前不能将它当成实机安全导航地图。
 
 也可以在启动时指定其他地图：
 
@@ -181,9 +227,12 @@ cd ~/go2_ws
 
 ## 五、开源项目说明
 
-本项目基于 Unitree Go2 description、CHAMP、Livox SDK2、`livox_ros_driver2`、LCAS `livox_laser_simulation_ros2` 和 `FAST_LIO_ROS2` 等开源项目开发，各部分遵循其原始许可证。
+本项目基于 Unitree Go2 description、CHAMP、Livox SDK2、`livox_ros_driver2`、LCAS `livox_laser_simulation_ros2`、XjuHurricaneQuadVision `FAST_LIO` 和 `fast_gicp` 等开源项目开发，各部分遵循其原始许可证。
 
-`patches/` 保存了针对固定依赖版本的必要补丁，用于补充 Livox `CustomMsg` 输出、适配 ROS 2 Humble，并保证 FAST-LIO 在结束建图时保存完整 PCD 地图。
+`patches/` 保存针对固定依赖版本的补丁；当前安装脚本应用 Gazebo Livox、
+真实 Livox 驱动时间戳、FAST-LIO 手持建图与时间戳保护补丁。
+`fast_lio_local_map.patch` 是历史局部地图实验，不在当前累计建图入口应用。
+当前保存方式见上文，不承诺退出 FAST-LIO 时自动生成完整 PCD。
 
 ## 六、Docker 部署
 
@@ -228,7 +277,9 @@ docker compose build
 
 首次构建会下载 ROS 镜像、依赖源码并完成编译，耗时较长。最终镜像约为 2 GB。
 
-镜像会编译并检查 `go2_mid360_sim`、`go2_fastlio_localization` 和 `go2_nav_bringup`。
+镜像会构建完整工作空间，并检查 `go2_mid360_sim`、
+`go2_fastlio_localization`、`go2_real_localization` 和 `go2_nav_bringup`
+是否可被 ROS 2 找到；这不是实机 GICP 或 Gazebo 图形运行验收。
 如果使用的是拆包前构建的旧镜像，更新仓库后执行：
 
 ```bash

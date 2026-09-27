@@ -15,6 +15,7 @@ RUN ./tools/setup_mid360_dependencies.bash \
     && source /go2_ws/install/setup.bash \
     && ros2 pkg prefix go2_mid360_sim \
     && ros2 pkg prefix go2_fastlio_localization \
+    && ros2 pkg prefix go2_real_localization \
     && ros2 pkg prefix go2_nav_bringup \
     && ros2 run go2_fastlio_localization pcd_to_nav2_map --help \
     && ros2 launch go2_nav_bringup navigation.launch.py --show-args \

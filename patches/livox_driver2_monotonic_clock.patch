@@ -1,0 +1,110 @@
+diff --git a/src/comm/pub_handler.cpp b/src/comm/pub_handler.cpp
+--- a/src/comm/pub_handler.cpp
++++ b/src/comm/pub_handler.cpp
+@@ -114,7 +114,7 @@ void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t d
+       ImuData imu_data;
+       imu_data.lidar_type = static_cast<uint8_t>(LidarProtoType::kLivoxLidarType);
+       imu_data.handle = handle;
+-      imu_data.time_stamp = GetEthPacketTimestamp(data->time_type,
++      imu_data.time_stamp = self->GetEthPacketTimestamp(handle, data->time_type,
+                                                   data->timestamp, sizeof(data->timestamp));
+       imu_data.gyro_x = imu->gyro_x;
+       imu_data.gyro_y = imu->gyro_y;
+@@ -140,7 +140,7 @@ void PubHandler::OnLivoxLidarPointCloudCallback(uint32_t handle, const uint8_t d
+   packet.data_type = data->data_type;
+   packet.point_num = data->dot_num;
+   packet.point_interval = data->time_interval * 100 / data->dot_num;  //ns
+-  packet.time_stamp = GetEthPacketTimestamp(data->time_type,
++  packet.time_stamp = self->GetEthPacketTimestamp(handle, data->time_type,
+                                             data->timestamp, sizeof(data->timestamp));
+   uint32_t length = data->length - sizeof(LivoxLidarEthernetPacket) + 1;
+   packet.raw_data.insert(packet.raw_data.end(), data->data, data->data + length);
+@@ -193,7 +193,7 @@ void PubHandler::CheckTimer(uint32_t id) {
+       frame_.lidar_num = 0;
+     }
+   } else { // Disable time synchronization
+-    auto now_time = std::chrono::high_resolution_clock::now();
++    auto now_time = std::chrono::steady_clock::now();
+     //First Set
+     static bool first = true;
+     if (first) {
+@@ -262,8 +262,9 @@ bool PubHandler::GetLidarId(LidarProtoType lidar_type, uint32_t handle, uint32_t
+   return false;
+ }
+ 
+-uint64_t PubHandler::GetEthPacketTimestamp(uint8_t timestamp_type, uint8_t* time_stamp, uint8_t size) {
+-  LdsStamp time;
++uint64_t PubHandler::GetEthPacketTimestamp(uint32_t handle, uint8_t timestamp_type,
++                                           uint8_t* time_stamp, uint8_t size) {
++  LdsStamp time{};
+   memcpy(time.stamp_bytes, time_stamp, size);
+ 
+   if (timestamp_type == kTimestampTypeGptpOrPtp ||
+@@ -271,7 +272,24 @@ uint64_t PubHandler::GetEthPacketTimestamp(uint8_t timestamp_type, uint8_t* time
+     return time.stamp;
+   }
+ 
+-  return std::chrono::high_resolution_clock::now().time_since_epoch().count();
++  // NoSync packet timestamps are nanoseconds since LiDAR power-on. Anchor the
++  // device clock to Unix time once per LiDAR, then use device-time deltas for
++  // both point clouds and IMU. A host wall-clock adjustment must not alter
++  // either stream or their relative timing.
++  const uint64_t device_ns = static_cast<uint64_t>(time.stamp);
++  std::lock_guard<std::mutex> lock(timestamp_mutex_);
++  auto anchor = timestamp_anchors_.find(handle);
++  if (anchor == timestamp_anchors_.end()) {
++    const uint64_t epoch_ns = static_cast<uint64_t>(
++        std::chrono::duration_cast<std::chrono::nanoseconds>(
++            std::chrono::system_clock::now().time_since_epoch()).count());
++    anchor = timestamp_anchors_.emplace(
++        handle, DeviceClockAnchor{device_ns, epoch_ns}).first;
++  }
++  if (device_ns >= anchor->second.device_ns) {
++    return anchor->second.epoch_ns + (device_ns - anchor->second.device_ns);
++  }
++  return anchor->second.epoch_ns - (anchor->second.device_ns - device_ns);
+ }
+ 
+ /*******************************/
+diff --git a/src/comm/pub_handler.h b/src/comm/pub_handler.h
+--- a/src/comm/pub_handler.h
++++ b/src/comm/pub_handler.h
+@@ -75,7 +75,7 @@ class PubHandler {
+  public:
+   using PointCloudsCallback = std::function<void(PointFrame*, void *)>;
+   using ImuDataCallback = std::function<void(ImuData*, void*)>;
+-  using TimePoint = std::chrono::high_resolution_clock::time_point;
++  using TimePoint = std::chrono::steady_clock::time_point;
+ 
+   PubHandler() {}
+ 
+@@ -105,7 +105,8 @@ class PubHandler {
+                                              LivoxLidarEthernetPacket *data, void *client_data);
+   
+   static bool GetLidarId(LidarProtoType lidar_type, uint32_t handle, uint32_t& id);
+-  static uint64_t GetEthPacketTimestamp(uint8_t timestamp_type, uint8_t* time_stamp, uint8_t size);
++  uint64_t GetEthPacketTimestamp(uint32_t handle, uint8_t timestamp_type,
++                                 uint8_t* time_stamp, uint8_t size);
+ 
+   PointCloudsCallback points_callback_;
+   void* pub_client_data_ = nullptr;
+@@ -126,6 +127,12 @@ class PubHandler {
+   std::map<uint32_t, std::unique_ptr<LidarPubHandler>> lidar_process_handlers_;
+   std::map<uint32_t, std::vector<PointXyzlt>> points_;
+   std::map<uint32_t, LidarExtParameter> lidar_extrinsics_;
++  struct DeviceClockAnchor {
++    uint64_t device_ns;
++    uint64_t epoch_ns;
++  };
++  std::mutex timestamp_mutex_;
++  std::map<uint32_t, DeviceClockAnchor> timestamp_anchors_;
+   static std::atomic<bool> is_timestamp_sync_;
+   uint16_t lidar_listen_id_ = 0;
+ };
+@@ -134,4 +141,4 @@ PubHandler &pub_handler();
+ 
+ }  // namespace livox_ros
+ 
+-#endif  // LIVOX_DRIVER_PUB_HANDLER_H_
+\ No newline at end of file
++#endif  // LIVOX_DRIVER_PUB_HANDLER_H_

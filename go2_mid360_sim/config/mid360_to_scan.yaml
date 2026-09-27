@@ -1,18 +1,20 @@
-pointcloud_to_laserscan:
+mid360_cloud_to_scan:
   ros__parameters:
     use_sim_time: true
-    target_frame: base_link
+    target_frame: mid360_link
     transform_tolerance: 0.05
 
-    # Horizontal slice relative to base_link. Tune these two values in RViz
-    # if the robot body/legs appear or low obstacles are missing.
-    min_height: -0.15
-    max_height: 0.50
+    # Above-sensor slice for the flat wall/column demo. Keep the ray origin
+    # at the lidar, reject downward ground returns and zero-range placeholders.
+    # This is NOT general ground segmentation: low obstacles can be missed,
+    # and pitched terrain requires gravity-aligned filtering instead.
+    min_height: 0.02
+    max_height: 1.50
 
     angle_min: -3.141592653589793
     angle_max: 3.141592653589793
     angle_increment: 0.008726646259972
-    scan_time: 0.10
+    scan_time: 0.20
     range_min: 0.30
     range_max: 30.0
     use_inf: true

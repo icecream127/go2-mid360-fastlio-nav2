@@ -1,0 +1,118 @@
+diff --git a/src/laserMapping.cpp b/src/laserMapping.cpp
+index 85fd6ea..31f7c18 100644
+--- a/src/laserMapping.cpp
++++ b/src/laserMapping.cpp
+@@ -484,7 +484,6 @@ void map_incremental()
+     kdtree_incremental_time = omp_get_wtime() - st_time;
+ }
+ 
+-PointCloudXYZI::Ptr pcl_wait_pub(new PointCloudXYZI());
+ PointCloudXYZI::Ptr pcl_wait_save(new PointCloudXYZI());
+ void publish_frame_world(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudFull)
+ {
+@@ -580,36 +579,31 @@ void publish_effect_world(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::Shar
+ 
+ void publish_map(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudMap)
+ {
+-    PointCloudXYZI::Ptr laserCloudFullRes(dense_pub_en ? feats_undistort : feats_down_body);
+-    int size = laserCloudFullRes->points.size();
+-    PointCloudXYZI::Ptr laserCloudWorld( \
+-                    new PointCloudXYZI(size, 1));
+-
+-    for (int i = 0; i < size; i++)
+-    {
+-        RGBpointBodyToWorld(&laserCloudFullRes->points[i], \
+-                            &laserCloudWorld->points[i]);
+-    }
+-    *pcl_wait_pub += *laserCloudWorld;
+-
+-    sensor_msgs::msg::PointCloud2 laserCloudmsg;
+-    pcl::toROSMsg(*pcl_wait_pub, laserCloudmsg);
+-    // laserCloudmsg.header.stamp = ros::Time().fromSec(lidar_end_time);
+-    laserCloudmsg.header.stamp = get_ros_time(lidar_end_time);
+-    laserCloudmsg.header.frame_id = "odom";
+-    pubLaserCloudMap->publish(laserCloudmsg);
+-
+-    // sensor_msgs::msg::PointCloud2 laserCloudMap;
+-    // pcl::toROSMsg(*featsFromMap, laserCloudMap);
+-    // laserCloudMap.header.stamp = get_ros_time(lidar_end_time);
+-    // laserCloudMap.header.frame_id = "camera_init";
+-    // pubLaserCloudMap->publish(laserCloudMap);
++    if (!ikdtree.Root_Node) return;
++    // Official map semantics: snapshot the maintained ikd-tree, not scans.
++    // Extract at the 1 Hz publish timer, not on every estimator iteration.
++    // Both callbacks use the default mutually-exclusive callback group.
++    ikdtree.PCL_Storage.clear();
++    ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD);
++    featsFromMap->clear();
++    featsFromMap->points = ikdtree.PCL_Storage;
++    sensor_msgs::msg::PointCloud2 laserCloudMap;
++    pcl::toROSMsg(*featsFromMap, laserCloudMap);
++    laserCloudMap.header.stamp = get_ros_time(lidar_end_time);
++    laserCloudMap.header.frame_id = "odom";
++    pubLaserCloudMap->publish(laserCloudMap);
+ }
+ 
+-void save_to_pcd()
++bool save_to_pcd()
+ {
++    if (!ikdtree.Root_Node) return false;
++    ikdtree.PCL_Storage.clear();
++    ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD);
++    featsFromMap->clear();
++    featsFromMap->points = ikdtree.PCL_Storage;
++    if (featsFromMap->empty()) return false;
+     pcl::PCDWriter pcd_writer;
+-    pcd_writer.writeBinary(map_file_path, *pcl_wait_pub);
++    return pcd_writer.writeBinary(map_file_path, *featsFromMap) == 0;
+ }
+ 
+ template<typename T>
+@@ -930,7 +924,7 @@ public:
+         pubLaserCloudFull_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", 20);
+         pubLaserCloudFull_body_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered_body", 20);
+         pubLaserCloudEffect_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_effected", 20);
+-        pubLaserCloudMap_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/Laser_map", 20);
++        pubLaserCloudMap_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/Laser_map", 1);
+         pubOdomAftMapped_ = this->create_publisher<nav_msgs::msg::Odometry>("/Odometry", 20);
+         pubPath_ = this->create_publisher<nav_msgs::msg::Path>("/path", 20);
+         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+@@ -1031,13 +1025,7 @@ private:
+             fout_pre<<setw(20)<<Measures.lidar_beg_time - first_lidar_time<<" "<<euler_cur.transpose()<<" "<< state_point.pos.transpose()<<" "<<ext_euler.transpose() << " "<<state_point.offset_T_L_I.transpose()<< " " << state_point.vel.transpose() \
+             <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<< endl;
+ 
+-            if(0) // If you need to see map point, change to "if(1)"
+-            {
+-                PointVector ().swap(ikdtree.PCL_Storage);
+-                ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD);
+-                featsFromMap->clear();
+-                featsFromMap->points = ikdtree.PCL_Storage;
+-            }
++            // The local-map snapshot is extracted by publish_map() at 1 Hz.
+ 
+             pointSearchInd_surf.resize(feats_down_size);
+             Nearest_Points.resize(feats_down_size);
+@@ -1117,9 +1105,13 @@ private:
+         RCLCPP_INFO(this->get_logger(), "Saving map to %s...", map_file_path.c_str());
+         if (pcd_save_en)
+         {
+-            save_to_pcd();
+-            res->success = true;
+-            res->message = "Map saved.";
++            try {
++                res->success = save_to_pcd();
++                res->message = res->success ? "Local ikd-tree map saved (not full trajectory coverage)." : "Local map empty or write failed.";
++            } catch (const std::exception &e) {
++                res->success = false;
++                res->message = e.what();
++            }
+         }
+         else
+         {
+@@ -1195,4 +1187,4 @@ int main(int argc, char** argv)
+     }
+ 
+     return 0;
+-}
+\ No newline at end of file
++}

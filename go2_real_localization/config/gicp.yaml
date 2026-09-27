@@ -1,0 +1,26 @@
+gicp_localizer:
+  ros__parameters:
+    map_frame: map
+    odom_frame: odom
+    body_frame: livox_frame
+    cloud_topic: /cloud_registered_body
+    odom_topic: /Odometry
+    voxel_size: 0.10
+    local_radius: 25.0
+    registration_period: 1.0
+    max_input_age: 2.0
+    transform_timeout: 3.0
+    max_iterations: 40
+    num_threads: 4
+    correspondence_distance: 1.0
+    inlier_distance: 0.30
+    min_inlier_ratio: 0.60
+    max_rmse: 0.20
+    min_points: 100
+    max_correction_translation: 0.5
+    max_correction_rotation: 0.35
+    initial_max_translation: 2.0
+    initial_max_rotation: 0.8
+    initial_pose_enabled: false
+    # Pose of the IMU body in MAP, metres and radians; not Gazebo spawn pose.
+    initial_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

@@ -5,6 +5,7 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
+    LogInfo,
     SetLaunchConfiguration,
     TimerAction,
 )
@@ -114,9 +115,12 @@ def generate_launch_description():
         DeclareLaunchArgument("use_sim_time", default_value="true"),
         DeclareLaunchArgument("auto_initial_pose", default_value="true"),
         DeclareLaunchArgument("auto_initial_delay", default_value="10.0"),
-        DeclareLaunchArgument("initial_x", default_value="0.0"),
-        DeclareLaunchArgument("initial_y", default_value="0.0"),
-        DeclareLaunchArgument("initial_yaw", default_value="0.0"),
+        DeclareLaunchArgument("initial_x", default_value="0.0",
+                              description="ICP initial guess in map frame, not Gazebo spawn x"),
+        DeclareLaunchArgument("initial_y", default_value="0.0",
+                              description="ICP initial guess in map frame, not Gazebo spawn y"),
+        DeclareLaunchArgument("initial_yaw", default_value="0.0",
+                              description="ICP initial yaw in map frame (radians), not spawn heading"),
         DeclareLaunchArgument(
             "pcd_map",
             default_value=os.path.join(
@@ -133,6 +137,9 @@ def generate_launch_description():
             "params_file",
             default_value=os.path.join(go2_share, "config", "autonomy", "fast_lio_nav2.yaml"),
         ),
+        LogInfo(msg=["Reference PCD map: ", pcd_map]),
+        LogInfo(msg=["Navigation occupancy map: ", nav_map]),
+        LogInfo(msg="Navigation mode: FAST-LIO odometry + ICP; map publication/saving disabled in FAST-LIO."),
         localization,
         TimerAction(period=16.0, actions=[map_server, map_lifecycle]),
         # Start Nav2 only after the delayed automatic ICP initialization has

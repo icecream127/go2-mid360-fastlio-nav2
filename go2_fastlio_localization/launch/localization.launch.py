@@ -30,23 +30,27 @@ def generate_launch_description():
     initial_y = LaunchConfiguration("initial_y")
     initial_yaw = LaunchConfiguration("initial_yaw")
 
-    fast_lio_stack = IncludeLaunchDescription(
+    simulation = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(localization_share, "launch", "mapping.launch.py")
+            os.path.join(sim_share, "launch", "simulation.launch.py")
         ),
         launch_arguments={
             "world": world,
             "gui": gui,
-            "show_rviz": mapping_rviz,
+            "rviz": mapping_rviz,
             "use_sim_time": use_sim_time,
             # Nav2's local odometry is derived from FAST-LIO below.  Do not
             # start the legacy Gazebo ground-truth odometry helper.
             "ground_truth_odom": "false",
-            "save_pcd": "false",
-            # Keep even an explicitly requested map-save service away from
-            # the reference PCD used by ICP.
-            "map_output": os.path.join(workspace_dir, "maps", "localization_session.pcd"),
+            "scan": "false",
         }.items(),
+    )
+
+    odometry = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(localization_share, "launch", "odometry.launch.py")
+        ),
+        launch_arguments={"use_sim_time": use_sim_time}.items(),
     )
 
     fast_lio_odom_bridge = Node(
@@ -107,7 +111,9 @@ def generate_launch_description():
                     workspace_dir, "maps", "mid360_3d.pcd"
                 ),
             ),
-            fast_lio_stack,
+            simulation,
+            # Let CHAMP stand and settle before IMU initialization.
+            TimerAction(period=14.0, actions=[odometry]),
             fast_lio_odom_bridge,
             TimerAction(period=14.0, actions=[localizer]),
         ]

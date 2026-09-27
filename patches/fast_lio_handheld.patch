@@ -1,0 +1,42 @@
+diff --git a/src/IMU_Processing.hpp b/src/IMU_Processing.hpp
+index f35378f..c0ebc12 100644
+--- a/src/IMU_Processing.hpp
++++ b/src/IMU_Processing.hpp
+@@ -23,7 +23,7 @@
+ 
+ /// *************Preconfiguration
+ 
+-#define MAX_INI_COUNT (10)
++#define MAX_INI_COUNT (1000)
+ 
+ const bool time_list(PointType &x, PointType &y) {return (x.curvature < y.curvature);};
+ 
+diff --git a/src/laserMapping.cpp b/src/laserMapping.cpp
+index 85fd6ea..ff99847 100644
+--- a/src/laserMapping.cpp
++++ b/src/laserMapping.cpp
+@@ -930,7 +930,7 @@ public:
+         pubLaserCloudFull_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", 20);
+         pubLaserCloudFull_body_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered_body", 20);
+         pubLaserCloudEffect_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_effected", 20);
+-        pubLaserCloudMap_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/Laser_map", 20);
++        pubLaserCloudMap_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/Laser_map", 1);
+         pubOdomAftMapped_ = this->create_publisher<nav_msgs::msg::Odometry>("/Odometry", 20);
+         pubPath_ = this->create_publisher<nav_msgs::msg::Path>("/path", 20);
+         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+diff --git a/src/preprocess.cpp b/src/preprocess.cpp
+index 46fc75d..9015782 100644
+--- a/src/preprocess.cpp
++++ b/src/preprocess.cpp
+@@ -180,9 +180,9 @@ void Preprocess::avia_handler(const livox_ros_driver2::msg::CustomMsg::UniquePtr
+           pl_full[i].curvature = msg->points[i].offset_time /
+                                  float(1000000);  // use curvature as time of each laser points, curvature unit: ms
+ 
+-          if ((abs(pl_full[i].x - pl_full[i - 1].x) > 1e-7)
++          if (((abs(pl_full[i].x - pl_full[i - 1].x) > 1e-7)
+               || (abs(pl_full[i].y - pl_full[i - 1].y) > 1e-7)
+-              || (abs(pl_full[i].z - pl_full[i - 1].z) > 1e-7)
++              || (abs(pl_full[i].z - pl_full[i - 1].z) > 1e-7))
+               && (pl_full[i].x * pl_full[i].x + pl_full[i].y * pl_full[i].y + pl_full[i].z * pl_full[i].z > (blind * blind)))
+           {
+             pl_surf.push_back(pl_full[i]);

@@ -1,0 +1,68 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Fixed Frame: map
+    Background Color: 32; 32; 32
+    Frame Rate: 15
+  Displays:
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Reference PCD
+      Enabled: true
+      Topic:
+        Value: /gicp/map
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+      Position Transformer: XYZ
+      Color Transformer: FlatColor
+      Color: 160; 160; 160
+      Style: Points
+      Size (Pixels): 2
+      Alpha: 1
+      Decay Time: 0
+    - Class: rviz_default_plugins/PointCloud2
+      Name: GICP Aligned Scan
+      Enabled: true
+      Topic:
+        Value: /gicp/aligned_cloud
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+      Position Transformer: XYZ
+      Color Transformer: FlatColor
+      Color: 0; 255; 160
+      Style: Points
+      Size (Pixels): 3
+      Alpha: 1
+      Decay Time: 0
+    - Class: rviz_default_plugins/Pose
+      Name: Localized IMU Pose
+      Enabled: true
+      Topic:
+        Value: /gicp/pose
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+      Shape: Axes
+      Axes Length: 0.5
+      Axes Radius: 0.03
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/SetInitialPose
+      Topic: /initialpose
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 20
+      Pitch: 0.8
+      Yaw: 0.3
+      Target Frame: map
+      Focal Point: {X: 0, Y: 0, Z: 0}
+Window Geometry:
+  Width: 1200
+  Height: 800

@@ -14,6 +14,8 @@ setup(
     description="FAST-LIO odometry bridge, PCD ICP localization and map conversion for Go2.",
     license="BSD-3-Clause",
     entry_points={"console_scripts": [
+        "save_live_map = go2_fastlio_localization.save_live_map:main",
+        "check_stationary = go2_fastlio_localization.check_stationary:main",
         "fast_lio_odom_bridge = go2_fastlio_localization.fast_lio_odom_bridge:main",
         "pcd_to_nav2_map = go2_fastlio_localization.pcd_to_nav2_map:main",
         "pcd_icp_localizer = go2_fastlio_localization.pcd_icp_localizer:main",

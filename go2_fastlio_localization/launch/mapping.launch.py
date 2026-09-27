@@ -81,11 +81,13 @@ def generate_launch_description():
             DeclareLaunchArgument("show_rviz", default_value="true"),
             DeclareLaunchArgument("use_sim_time", default_value="true"),
             DeclareLaunchArgument("ground_truth_odom", default_value="false"),
-            DeclareLaunchArgument("save_pcd", default_value="true"),
+            # Saving is explicit through save_live_map.  In particular, never
+            # let the upstream /map_save service overwrite the reference PCD.
+            DeclareLaunchArgument("save_pcd", default_value="false"),
             DeclareLaunchArgument(
                 "map_output",
                 default_value=os.path.join(
-                    workspace_dir, "maps", "mid360_3d.pcd"
+                    workspace_dir, "maps", "mapping_session.pcd"
                 ),
             ),
             simulation,

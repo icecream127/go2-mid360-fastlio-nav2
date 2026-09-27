@@ -21,7 +21,6 @@ def generate_launch_description():
     paused = LaunchConfiguration("paused")
     lite = LaunchConfiguration("lite")
     contact_sensor_enabled = LaunchConfiguration("contact_sensor")
-    ros_control_file = LaunchConfiguration("ros_control_file")
     world_init_x = LaunchConfiguration("world_init_x")
     world_init_y = LaunchConfiguration("world_init_y")
     world_init_z = LaunchConfiguration("world_init_z")
@@ -42,10 +41,8 @@ def generate_launch_description():
         default_value="False",
         description="Run the high-CPU CHAMP foot contact helper",
     )
-    declare_ros_control_file = DeclareLaunchArgument(
-        "ros_control_file",
-        default_value=os.path.join(gz_pkg_share, "config/ros_control.yaml"),
-    )
+    # Controller parameters come from the robot's gazebo_ros2_control plugin.
+    # No ros_control_file launch argument: it was declared but never consumed.
     declare_gazebo_world = DeclareLaunchArgument(
         "world", default_value=os.path.join(gz_pkg_share, "worlds/default.world")
     )
@@ -176,7 +173,6 @@ def generate_launch_description():
             declare_paused,
             declare_lite,
             declare_contact_sensor,
-            declare_ros_control_file,
             declare_gazebo_world,
             declare_world_init_x,
             declare_world_init_y,

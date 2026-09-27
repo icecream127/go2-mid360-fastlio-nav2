@@ -34,9 +34,6 @@ def generate_launch_description():
         package="go2_description"
     ).find("go2_description")
     joints_config = os.path.join(config_pkg_share, "config/joints/joints.yaml")
-    ros_control_config = os.path.join(
-        config_pkg_share, "config/ros_control/ros_control.yaml"
-    )
     gait_config = os.path.join(config_pkg_share, "config/gait/gait.yaml")
     links_config = os.path.join(config_pkg_share, "config/links/links.yaml")
     default_model_path = os.path.join(descr_pkg_share, "xacro/robot_VLP.xacro")
@@ -79,11 +76,8 @@ def generate_launch_description():
     declare_lite = DeclareLaunchArgument(
         "lite", default_value="false", description="Lite"
     )
-    declare_ros_control_file = DeclareLaunchArgument(
-        "ros_control_file",
-        default_value=ros_control_config,
-        description="Ros control config path",
-    )
+    # Joint PID is loaded by go2_description/xacro/gazebo.xacro.
+    # Do not expose a ros_control_file argument that the plugin never reads.
     declare_gazebo_world = DeclareLaunchArgument(
         "world", default_value=default_world_path, description="Gazebo world name"
     )
@@ -171,7 +165,8 @@ def generate_launch_description():
         executable="pointcloud_to_laserscan_node",
         name="mid360_cloud_to_scan",
         output="screen",
-        parameters=[LaunchConfiguration("scan_params_file")],
+        parameters=[LaunchConfiguration("scan_params_file"),
+                    {"use_sim_time": use_sim_time}],
         remappings=[("cloud_in", "/livox/lidar"), ("scan", "/scan")],
         condition=IfCondition(
             PythonExpression(
@@ -203,7 +198,6 @@ def generate_launch_description():
             declare_ground_truth_odom,
             declare_robot_name,
             declare_lite,
-            declare_ros_control_file,
             declare_gazebo_world,
             declare_gui,
             declare_world_init_x,

@@ -1,0 +1,47 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Saved Room Map
+      Enabled: true
+      Value: true
+      Topic: /cloud_pcd
+      Queue Size: 1
+      Unreliable: false
+      Position Transformer: XYZ
+      Color Transformer: FlatColor
+      Color: 255; 255; 255
+      Alpha: 1
+      Decay Time: 0
+      Style: Points
+      Size (Pixels): 4
+      Size (m): 0.05
+      Use Fixed Frame: true
+  Enabled: true
+  Global Options:
+    Background Color: 32; 32; 32
+    Fixed Frame: map
+    Frame Rate: 15
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 12
+      Pitch: 1.0
+      Yaw: 0.5
+      Focal Point: {X: -2.3, Y: 0.8, Z: 1.7}
+      Target Frame: map
+      Name: Current View
+Window Geometry:
+  Width: 1200
+  Height: 800
+  X: 40
