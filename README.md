@@ -21,9 +21,18 @@
 - 能正常显示 Gazebo 和 RViz 图形窗口
 - 安装过程需要网络和 `sudo` 权限
 
-### 2. 下载并自动安装
+### 2. 下载并安装依赖、编译工作空间
 
-打开 Ubuntu 终端，依次执行：
+`./tools/setup_mid360_dependencies.bash` **仍是当前的完整安装入口**，已包含新版
+Xju FAST-LIO 和实机 GICP 包的依赖。它不是 ROS 2 安装器：请先安装
+**ROS 2 Humble Desktop**，确认下面的检查通过，再执行下载命令。
+全新 Ubuntu 22.04 只有 `git` 还不够。
+
+```bash
+test -f /opt/ros/humble/setup.bash && echo "ROS 2 Humble 已安装"
+```
+
+以下命令用于新工作空间；如果目标目录已有项目，不要重复 `git clone`：
 
 ```bash
 sudo apt update
@@ -39,14 +48,53 @@ cd unitree-go2-ros2
 
 安装脚本会自动完成以下工作：
 
-- 安装项目需要的 ROS 2 和系统依赖；
-- 下载固定版本的 Livox SDK2、Livox ROS 2 驱动、Livox Gazebo 插件和 FAST-LIO；
+- 在已安装 Humble 的基础上安装项目需要的 ROS 功能包和系统依赖（包括 Gazebo、Nav2）；
+- 下载固定版本的 Livox SDK2、Livox ROS 2 驱动、Livox Gazebo 插件；
+- 下载 **[XjuHurricaneQuadVision/FAST_LIO](https://github.com/XjuHurricaneQuadVision/FAST_LIO)**，
+  固定提交为 `440a8e3e909023b7cb084e99b0c5070e3baebe86`，目录为 `~/go2_ws/src/FAST_LIO`；
+  不会下载旧的 `FAST_LIO_ROS2`，也不是直接下载 HKU 原仓库；
 - 下载固定版本的 CPU `fast_gicp`，供独立的真实雷达 GICP 定位包构建；
-- 应用 ROS 2 Humble 兼容补丁；
+- 应用 Gazebo/Humble 兼容修改、Livox 驱动时间戳补丁、FAST-LIO 手持建图及时间戳保护补丁；
 - 编译整个 `~/go2_ws` 工作空间；
-- 把仓库附带的地图复制到 `~/go2_ws/maps`。
+- 把仓库附带的仿真地图复制到 `~/go2_ws/maps`，不覆盖已有同名地图。
 
-### 3. 一条命令启动
+等待脚本最后打印 `Dependencies and workspace build completed.`，才表示安装及编译完成。
+若中途出现下载、补丁或编译错误，不能直接跳到启动步骤。当前脚本是全量安装，
+即使只用真实雷达，也会安装仿真依赖。本文不等同于已经完成全新 Ubuntu 的端到端验收。
+
+已有工作空间重新执行前，请先保存自己的依赖源码修改。脚本会将有修改的依赖目录
+移到工作空间的 `dependency_backups/` 后重新下载；不要在 `src` 中同时保留
+`FAST_LIO` 和旧 `FAST_LIO_ROS2`，否则会出现同名 `fast_lio` 包冲突。
+
+### 3. 安装后选择启动入口
+
+每个新终端先加载环境：
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/go2_ws/install/setup.bash
+```
+
+**真实 MID-360 建图：**先按 [真实雷达说明](README_REAL_MID360.md) 配置有线网卡和
+`go2_fastlio_localization/config/mid360_real.json`。仓库当前预设主机地址
+`192.168.1.50`、雷达地址 `192.168.1.111`，必须与实际设备一致。然后启动：
+
+```bash
+ros2 launch go2_fastlio_localization real_mapping.launch.py
+```
+
+**真实 MID-360 已有地图 GICP 定位：**先将真实房间 PCD 复制到目标电脑，
+将下面的占位路径替换为实际绝对路径，再执行。与上面的建图入口二选一，避免重复启动驱动和 FAST-LIO。
+
+```bash
+ros2 launch go2_real_localization bringup.launch.py map_path:=/绝对路径/房间地图.pcd
+```
+
+初始位姿、参数及验收方式见 [GICP 使用说明](go2_real_localization/README.md)。
+该入口不启动 Nav2 或电机控制，安装脚本也不会自动复制你本机 `~/go2_maps` 中的真实地图。
+
+**Gazebo 仿真导航（更换 FAST-LIO 后尚待回归验收）：**以下为保留的仿真流程，
+不能作为实机导航启动命令，也不能将编译成功当作仿真已验证。
 
 ```bash
 cd ~/go2_ws
