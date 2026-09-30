@@ -7,16 +7,49 @@
 
 ```
 go2_real_localization/
-  src/gicp_localizer.cpp          # 配准、质量检查、map→odom
+  include/go2_real_localization/
+    config.hpp                   # 参数与有限值/范围校验
+    registration_pipeline.hpp    # 配准与几何质量检查（无 ROS）
+    localization_state.hpp       # 初值、版本、map→odom、时效（无点云）
+    gicp_localizer_node.hpp       # ROS 输入输出
+    registration_worker.hpp      # 单工作线程、有界任务/结果槽
+  src/registration_pipeline.cpp
+  src/localization_state.cpp
+  src/gicp_localizer_node.cpp
+  src/main.cpp
   config/gicp.yaml               # 只放 GICP 参数
   launch/localization.launch.py # 只定位；已有 FAST-LIO 时使用
   launch/bringup.launch.py       # 实机驱动 + FAST-LIO + GICP
   rviz/localization.rviz         # 灰色地图、绿色对齐扫描、机体位姿
+  tools/pcd_to_nav2_map.py      # PCD 地面/障碍物投影为 Nav2 PGM+YAML
   test/synthetic_check.py        # 无硬件坐标/质量门限回归测试
+  test/test_localization_core.cpp # 状态、并发交接、ROI、退化回归
+  test/runtime_check.py          # 零时间戳、ROS 时钟暂停/回拨、只读参数
+  test/test_pcd_to_nav2_map.py  # 地图转换回归测试
 ```
 
 真实传感器配置继续唯一存放于 go2_fastlio_localization/config/mid360_real.json 和 fast_lio_mid360_real.yaml；本包引用它们，不复制、不使用仿真 profile。
 启动参数 user_config_path / lio_params / params_file 分别覆盖驱动、里程计、GICP 的配置路径。
+
+## 把已有 PCD 转成 Nav2 占用图
+
+Nav2 的 map_server 读取同名 `.pgm` 图像和 `.yaml` 元数据，而 GICP 继续读取原始三维 PCD；两张地图必须来自**同一份 PCD、同一 map 坐标系**。不要把 9 月 24 日的 2D 地图与 9 月 26 日的 PCD 混用。
+
+转换工具通过 `colcon build --packages-select go2_real_localization --symlink-install` 安装。已检查 `real_room_20260926_110555_607459.pcd` 的高度分布：地面主峰约为 map 坐标 z=-0.75 m，房顶约 z=2.6 m；这只是该地图的示例，不是所有地图的通用值。
+
+```bash
+cd ~/go2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run go2_real_localization pcd_to_nav2_map \
+  /home/ice/go2_maps/real_room_20260926_110555_607459.pcd \
+  --floor-z=-0.75 --floor-tolerance=0.10 \
+  --obstacle-min-height=0.15 --obstacle-max-height=1.50
+```
+
+输出在同一目录：`real_room_20260926_110555_607459_nav2_0.05m.pgm` 和 `.yaml`。如文件已存在，工具会拒绝覆盖；重新调参可用 `--output-prefix=/绝对路径/另一个名字`。地面高度和障碍物高度分别是地图绝对 z 与相对地面的高度，不要混淆。黑色=占用，白色=观测到地面且没有障碍命中的格子，灰色=未知；默认不把整个房间矩形臆断为可通行。必要时可用 `--bounds XMIN YMIN XMAX YMAX` 裁剪，并在人工审图后谨慎使用 `--free-radius` 扩展稀疏地面证据。
+
+这是**候选导航图**，不是自动通过安全验收的地图。PCD 只有点命中，没有完整射线可见性；地面回波不证明机器马的完整轮廓能通过，且地图可能包含建图时的人/移动物体。先检查 PGM 与真实布局、起点/目标是否处于连通白区，再用实时障碍层、正确机体 footprint 与定位失效停车保护做真机测试。当前本包不启动 Nav2 或电机；仿真的 `go2_nav_bringup/navigation.launch.py` 不能直接当真机启动文件。
 
 ## 编译与启动
 
@@ -54,6 +87,21 @@ ros2 topic echo /gicp/valid
 ros2 run tf2_ros tf2_echo map livox_frame
 ```
 
+### 配准测量输出（2026-09-28）
+
+每次完成并通过/未通过质量验收的配准，启动终端和 `/gicp/status` 都输出以下数据；不改原有体素、优化器和验收门限：
+
+- `scan_points`：输入 `/cloud_registered_body` 的点数（已由 FAST-LIO 去畸变，不是原始 Livox 包点数）。
+- `source_points`：去除非有限点、裁剪到 IMU 周围 `local_radius`、体素降采样后的配准源点数。
+- `map_points`：整个 PCD 降采样后的地图点数；`target_points`：本次裁剪的局部目标地图点数。
+- `aligned_points`：对齐后的全部源点数，不等于内点数。
+- `inlier_points`、`inlier_ratio`：对齐后按 `inlier_distance` 最近邻距离验收得到的内点数量与比例，不是优化器内部对应点数量。
+- `rmse_m`：上述内点的最近邻距离均方根，单位米；乘 100 得厘米。它是配准残差，不是绝对定位误差。
+- `registration_ms`：本次 `gicp.align()` 耗时，单位毫秒，不含整个输入/TF链延迟。
+- `observability_ratio`、`observability_points`：局部平面几何信息矩阵的最小/最大特征值比，以及参与检查的平面约束数。比例过低或有效约束不足时报告 `DEGENERATE`。
+
+点数不足或不收敛时也在启动终端打印可得的源/目标点数；不会伪造不存在的 RMSE。真实位置误差必须用独立测量的 IMU 位姿在同一地图坐标系下对照，不能用初猜、FAST-LIO 里程计或本配准结果自身当真值。
+
 ## 接口与坐标
 
 | 接口 | 类型/含义 |
@@ -77,14 +125,20 @@ TF 链：map --本包--> odom --FAST-LIO--> livox_frame。不要同时运行其�
 
 当前 YAML 的地图/扫描体素为 0.10 m，1 Hz 配准；这些是起步计算配置，
 不是精度承诺。C++ 中的 0.15 m 仅是未加载 YAML 时的回退默认值。
-local_radius 是围绕预测机体位置裁剪目标地图的半径。max_iterations / correspondence_distance 控制配准。
+local_radius 是源扫描绕 IMU 的半径。目标地图绕预测机体位置裁剪，半径另加本次允许的平移修正和 correspondence_distance，避免裁图边界把合法点排除。max_iterations / correspondence_distance 控制配准。
 inlier_distance 是评估内点的距离门限；max_rmse 是内点最近邻距离的均方根（米），不是 PCL fitness 的平方距离。
 min_inlier_ratio 与位姿修正门限同时检查，不能仅凭 hasConverged 判定定位可靠。
-这些检查不保证排除重复走廊等几何歧义，也没有全局搜索或回环优化。
+新增平面法向几何检查：对内点近邻拟合局部平面，按扫描尺度归一化旋转雅可比，构造 6×6 点到平面信息矩阵。`min_observability_ratio=0.001` 是最小/最大特征值比下限；约束不足 `min_points` 也拒绝。设为 0 可显式禁用这道门。它检查局部弱约束，不证明匹配位置全局唯一；重复但结构丰富的房间仍可能产生错误局部极值，也没有全局搜索或回环优化。该新阈值需在真实房间复测。
 输入过期、时间回退、frame 不匹配或配准失败会报告失效；失败不发布新修正 TF。
 TF 缓存与 RViz 可能仍显示旧结果，因此接运动控制前必须接入 /gicp/valid 和超时停车。
 时间回退后需重新给初始位姿。FAST-LIO 重启也应一并重启本定位节点。
-节点按最新扫描处理，不累积历史点云；fast_gicp 默认使用 4 个计算线程（num_threads），ROS 回调串行执行，需实测确认配准耗时满足输入时效。
+节点按最新扫描处理，不累积历史点云。ROS 回调仍在默认互斥组串行执行；点云转换、滤波、裁图、FastGICP 和几何评分在独立 worker 中执行，FastGICP 内部默认 4 线程。worker 只持有不可变输入快照和只读地图；不会读写节点定位状态或 Publisher。至多一个任务/结果占位，忙碌期间只更新最新输入，不累积任务队列。新初值、时间回退和失效会使旧 generation 的工作结果作废。
+
+配准调度、50 ms TF/有效期检查、输入年龄和 TTL 全部使用 ROS time；steady clock 只用于计算耗时。`use_sim_time=true` 时暂停 `/clock` 会暂停这些逻辑时间，倍速按 ROS 时间运行；回拨后清除旧输入并要求新初值。真实机器人使用 `use_sim_time=false`。控制端仍需独立的接收超时检测，以覆盖定位进程退出。
+
+接受结果时先提交 map→odom 状态、调用 TF 发布，再发布位姿/点云和 valid=true。不同 DDS 话题的接收顺序没有原子性保证；消费者应等待所需时间的 TF 可查询，不应把先收到 Bool 当作 TF 已到达的证明。
+
+全部本包算法/接口参数声明为只读。用 YAML/launch 设置后重启节点，`ros2 param set` 会明确拒绝，避免返回成功但实际上没更新；运行时切换 use_sim_time 也拒绝。`/initialpose` 仍可随时给新初值，它会废弃尚在计算的旧结果。初值尚未按历史里程计传播到扫描时间，首次接受前仍保持静止。
 当前 C++ 使用所固定 fast_gicp 版本的 0.0005 m 平移步长收敛阈值；
 先前硬设 0.000001 m 时，0.10 m 体素配置的合成测试在 40 次迭代后持续
 报 `NOT_CONVERGED`。恢复上游阈值后仍须通过内点率、RMSE、位姿修正量和
@@ -115,4 +169,7 @@ TF 缓存与 RViz 可能仍显示旧结果，因此接运动控制前必须接�
 source ~/go2_ws/install/setup.bash
 unset ROS_DOMAIN_ID ROS_LOCALHOST_ONLY
 python3 ~/go2_ws/src/unitree-go2-ros2/go2_real_localization/test/synthetic_check.py
+python3 ~/go2_ws/src/unitree-go2-ros2/go2_real_localization/test/runtime_check.py
 ```
+
+2026-09-30 重构与原生 Ubuntu 22.04 部署说明见 [本次记录](../docs/GICP_REFACTOR_2026-09-30.md)。

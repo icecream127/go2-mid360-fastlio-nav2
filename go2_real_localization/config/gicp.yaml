@@ -7,6 +7,7 @@ gicp_localizer:
     odom_topic: /Odometry
     voxel_size: 0.10
     local_radius: 25.0
+    # Scan radius about the IMU; target also includes correction/search padding.
     registration_period: 1.0
     max_input_age: 2.0
     transform_timeout: 3.0
@@ -17,6 +18,8 @@ gicp_localizer:
     min_inlier_ratio: 0.60
     max_rmse: 0.20
     min_points: 100
+    # Scaled point-to-plane information min/max eigenvalue ratio; 0 disables.
+    min_observability_ratio: 0.001
     max_correction_translation: 0.5
     max_correction_rotation: 0.35
     initial_max_translation: 2.0

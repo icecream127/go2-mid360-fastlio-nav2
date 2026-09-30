@@ -1,5 +1,7 @@
 # 真实 MID-360 建图：当前唯一操作入口
 
+源码全链路拆解与待验证问题见 [实机项目分析 README](README_REAL_PROJECT_ANALYSIS.md)。当前运行源码保持不变，问题先记录，暂未修复。
+
 2026-09-22：已切换到 XjuHurricaneQuadVision/FAST_LIO，提交
 `440a8e3e909023b7cb084e99b0c5070e3baebe86`。当前算法源码不套用旧版补丁。
 
