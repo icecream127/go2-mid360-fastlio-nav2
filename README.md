@@ -1,5 +1,7 @@
 # Unitree Go2 + Livox MID-360 + FAST-LIO + Nav2
 
+实机定位学习文档：[真实 MID-360 重定位实践：FAST-LIO + fast_gicp](docs/GICP_REAL_PRACTICE.md)，包含数据链、TF、调参、时间戳修复、累计地图和实测日志解读。
+
 > **真实 MID-360 当前使用 Xju 新版 FAST-LIO：请按 [真实雷达使用与参数入口](README_REAL_MID360.md) 操作。**
 > 旧真实雷达操作记录已归档；下面的仿真导航说明为原有流程，新算法坐标系改变后尚未回归验收。
 > 本轮代码、WSL 时钟修改和未完成的验收见 [2026-09-27 变更记录](docs/CHANGELOG_2026-09-27.md)。
@@ -22,6 +24,22 @@
 - 安装过程需要网络和 `sudo` 权限
 
 ### 2. 下载并安装依赖、编译工作空间
+
+**Jetson / 只用真实 MID-360 建图和 GICP：**使用新的纯实机脚本，
+不要运行下面的全量仿真安装脚本。先安装 Ubuntu 22.04 对应的 ROS 2 Humble，
+克隆本仓库后执行：
+
+```bash
+cd ~/go2_ws/src/unitree-go2-ros2
+bash tools/setup_real_mid360_dependencies.bash
+source ~/go2_ws/install/setup.bash
+```
+
+它仅下载实机依赖并构建五个实机 ROS 包，不安装 Gazebo、CHAMP、Nav2，
+仍使用原来的 `install/setup.bash`。已有源码、地图和仿真产物不删除。
+网络、地图、旧部署处理和验证边界见 [纯实机部署说明](docs/REAL_ONLY_DEPLOYMENT.md)。
+
+**需要仿真时，才使用以下全量流程：**
 
 `./tools/setup_mid360_dependencies.bash` **仍是当前的完整安装入口**，已包含新版
 Xju FAST-LIO 和实机 GICP 包的依赖。它不是 ROS 2 安装器：请先安装
